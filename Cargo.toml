@@ -1,0 +1,13 @@
+[workspace]
+members = [
+    "server",
+    "client", "shared",
+]
+resolver = "2"
+
+[workspace.package]
+authors = ["Jesse Greenough"]
+description = "Socket.io Implementation"
+
+
+[workspace.dependencies]
