@@ -32,7 +32,6 @@ where
         match this.stream.poll_next(ctx) {
             Poll::Ready(Some(packet)) => {
                 let encoded_packet = packet.encode_binary();
-                let mut result: BinaryType = Vec::new();
 
                 // Add length header similar to WebSocket-like encoding
                 let payload_length = encoded_packet.len();
@@ -59,6 +58,8 @@ where
                     Some(RawData::Text(..)) => { PLAIN_TEXT_MASK },
                     None => { PLAIN_TEXT_MASK }
                 };
+
+                let mut result: BinaryType = Vec::new();
                 result.extend(header);
                 result.extend(encoded_packet);
 
