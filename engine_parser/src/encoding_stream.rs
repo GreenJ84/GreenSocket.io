@@ -4,7 +4,7 @@ use futures::Stream;
 use pin_project::pin_project;
 
 use crate::packet::Packet;
-use crate::constants::{RawData, BINARY_MASK, PLAIN_TEXT_MASK, BinaryType};
+use crate::constants::{RawData, BINARY_MASK, BinaryType};
 
 #[pin_project]
 pub struct PacketEncoderStream<S> {
@@ -53,17 +53,12 @@ where
                     header.push((payload_length >> 8) as u8);
                     header.push(payload_length as u8);
                 }
-                header[0] |= match &packet.data {
-                    Some(RawData::Binary(..))=> { BINARY_MASK },
-                    Some(RawData::Text(..)) => { PLAIN_TEXT_MASK },
-                    None => { PLAIN_TEXT_MASK }
-                };
+                if let Some(RawData::Binary(_)) = &packet.data{
+                    header[0] |= BINARY_MASK;
+                }
+                header.extend(encoded_packet);
 
-                let mut result: BinaryType = Vec::new();
-                result.extend(header);
-                result.extend(encoded_packet);
-
-                Poll::Ready(Some(result))
+                Poll::Ready(Some(header))
             }
             Poll::Ready(None) => Poll::Ready(None),
             Poll::Pending => Poll::Pending,
