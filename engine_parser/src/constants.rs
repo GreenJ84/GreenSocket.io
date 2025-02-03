@@ -11,3 +11,11 @@ pub enum RawData {
     Text(String),
     Binary(BinaryType)
 }
+impl RawData {
+    pub fn len(&self) -> usize {
+        match self {
+            RawData::Binary(b) => b.len(),
+            RawData::Text(s) => s.len(),
+        }
+    }
+}
