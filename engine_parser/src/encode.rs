@@ -9,7 +9,9 @@ impl Packet {
             // Binary data, return if supported else encode to base64
             Some(RawData::Binary(data)) => {
                 if supports_binary {
-                    self.data.clone().unwrap()
+                    let mut bin = Vec::from([BINARY_MASK]);
+                    bin.extend_from_slice(&data);
+                    RawData::Binary(bin)
                 } else {
                     let encoded = format!("b{}", general_purpose::URL_SAFE.encode(data));
                     RawData::Text(encoded)
@@ -26,33 +28,33 @@ impl Packet {
     }
 
     pub fn encode_binary(&self) -> BinaryType {
+        let mut res = Vec::<u8>::new();
         match &self.data {
-            Some(RawData::Binary(data)) => data.clone(),
-            Some(RawData::Text(text)) => {
-                let encoded_text = format!("{}{}", self._type.as_char(), text);
-                encoded_text.into_bytes()
+            Some(RawData::Binary(_)) => {
+                if let RawData::Binary(encoded_data) = self.encode(true){
+                    res.extend_from_slice(&encoded_data);
+                } else { panic!("Broken encoding implementation") };
+            },
+            Some(RawData::Text(_)) => {
+                res.push(PLAIN_TEXT_MASK);
+                if let RawData::Text(encoded_text) = self.encode(false) {
+                    res.extend_from_slice(&encoded_text.into_bytes());
+                } else { panic!("Broken encoding implementation") };
             }
-            None => Vec::from([self._type.as_char() as u8]), // No data, encode type
+            None => { res.extend_from_slice(&[PLAIN_TEXT_MASK, self._type.as_char() as u8]); }
         }
+        res
     }
 
-    pub fn encode_payload(packets: &[Self], supports_binary: bool) -> BinaryType {
+    pub fn encode_payload(packets: &[Self]) -> String {
         let size = packets.len();
-        let mut payload = Vec::with_capacity(packets.len());
+        let mut payload = String::with_capacity(packets.len() * 2);
         for (i, packet) in packets.iter().enumerate() {
-            let encoded = packet.encode(supports_binary);
-            match encoded {
-                RawData::Text(text) => {
-                    payload.push(PLAIN_TEXT_MASK);
-                    payload.extend_from_slice(text.as_bytes());
-                }
-                RawData::Binary(binary) => {
-                    payload.push(BINARY_MASK);
-                    payload.extend_from_slice(&binary);
-                }
-            }
+            if let RawData::Text(encoded) = packet.encode(false) {
+                payload.push_str(&encoded);
+            } else { }
             if i < size - 1 {
-                payload.push(SEPARATOR_BYTE);
+                payload.push(SEPARATOR_BYTE as char);
             }
         }
         payload
