@@ -4,16 +4,27 @@ use crate::constants::{RawData, SEPARATOR_BYTE, BINARY_MASK, PLAIN_TEXT_MASK, Bi
 use crate::packet::Packet;
 
 impl Packet {
+    /// Binary Data encoding always has:
+        /// - First bit set for a TEXT vs Binary flag
+        /// - Second bit set for Packet type
+        /// - Rest for data
+    /// Text Data encoding always has:
+        /// - First char -- as 'b' for Binary data -- as packet_type for Type
+        /// - Second char as packet_type for binary data
+        /// - Rest for data
     pub fn encode(&self, supports_binary: bool) -> RawData {
         match &self.data {
             // Binary data, return if supported else encode to base64
             Some(RawData::Binary(data)) => {
                 if supports_binary {
-                    let mut bin = Vec::from([BINARY_MASK]);
+                    let mut bin = Vec::from(
+                        [BINARY_MASK, self._type.as_char() as u8]
+                    );
                     bin.extend_from_slice(&data);
                     RawData::Binary(bin)
                 } else {
-                    let encoded = format!("b{}", general_purpose::URL_SAFE.encode(data));
+                    let mut encoded = format!("b{}", self._type.as_char());
+                    encoded.push_str(&general_purpose::URL_SAFE.encode(data));
                     RawData::Text(encoded)
                 }
             }
@@ -54,7 +65,7 @@ impl Packet {
                 payload.push_str(&encoded);
             } else { }
             if i < size - 1 {
-                payload.push(SEPARATOR_BYTE as char);
+                payload.push(char::from(SEPARATOR_BYTE));
             }
         }
         payload
