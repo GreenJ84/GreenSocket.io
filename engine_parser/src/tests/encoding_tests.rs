@@ -1,5 +1,8 @@
 use crate::{packet::*, constants::*};
 
+use base64::Engine;
+use base64::engine::general_purpose;
+
 #[cfg(test)]
 mod single_packet_encoding_tests {
     use super::*;
@@ -12,9 +15,11 @@ mod single_packet_encoding_tests {
             Some(RawData::Binary(vec![1, 2, 3, 4, 5])),
         );
 
-        let encoded = packet.encode(true); // supports_binary = true
+        let encoded = packet.encode(true);
         match encoded {
-            RawData::Binary(data) => assert_eq!(data, vec![1, 2, 3, 4, 5]),
+            RawData::Binary(data) => {
+                assert_eq!(data, vec![BINARY_MASK, PacketType::Message.as_char() as u8, 1, 2, 3, 4, 5])
+            },
             _ => panic!("Expected Binary data"),
         }
     }
@@ -27,11 +32,10 @@ mod single_packet_encoding_tests {
             Some(RawData::Binary(vec![1, 2, 3, 4, 5])),
         );
 
-        let encoded = packet.encode(false); // supports_binary = false
+        let encoded = packet.encode(false);
         match encoded {
             RawData::Text(text) => {
-                assert!(text.starts_with("b")); // base64 encoded data should start with 'b'
-                assert!(text.len() > 1); // Base64 encoded string should be longer than 1 char
+                assert_eq!(text, format!("b4{}", general_purpose::URL_SAFE.encode(vec![1, 2, 3, 4, 5]))); // base64 encoded data
             }
             _ => panic!("Expected Text data"),
         }
@@ -45,10 +49,10 @@ mod single_packet_encoding_tests {
             Some(RawData::Text("Hello, world!".to_string())),
         );
 
-        let encoded = packet.encode(true); // supports_binary = true
+        let encoded = packet.encode(true);
         match encoded {
             RawData::Text(text) => {
-                assert_eq!(text, "4Hello, world!"); // Should prefix with '4' (Message type)
+                assert_eq!(text, "4Hello, world!");
             }
             _ => panic!("Expected Text data"),
         }
@@ -62,10 +66,10 @@ mod single_packet_encoding_tests {
             Some(RawData::Text("Hello, world!".to_string())),
         );
 
-        let encoded = packet.encode(false); // supports_binary = true
+        let encoded = packet.encode(false);
         match encoded {
             RawData::Text(text) => {
-                assert_eq!(text, "4Hello, world!"); // Should prefix with '4' (Message type)
+                assert_eq!(text, "4Hello, world!");
             }
             _ => panic!("Expected Text data"),
         }
@@ -79,10 +83,10 @@ mod single_packet_encoding_tests {
             None,
         );
 
-        let encoded = packet.encode(true); // supports_binary = true
+        let encoded = packet.encode(true);
         match encoded {
             RawData::Text(text) => {
-                assert_eq!(text, "2"); // Should just be the character '2' for Ping type
+                assert_eq!(text, "2");
             }
             _ => panic!("Expected Text data"),
         }
@@ -101,8 +105,8 @@ mod forced_binary_encoding_tests{
             Some(RawData::Binary(vec![1, 2, 3, 4, 5])),
         );
 
-        let encoded = packet.encode_binary(); // supports_binary = true
-        assert_eq!(encoded, vec![1, 2, 3, 4, 5]);
+        let encoded = packet.encode_binary();
+        assert_eq!(encoded, vec![BINARY_MASK, PacketType::Message.as_char() as u8, 1, 2, 3, 4, 5]);
     }
 
     #[test]
@@ -113,8 +117,10 @@ mod forced_binary_encoding_tests{
             Some(RawData::Text("Hello world!".into())),
         );
 
-        let encoded = packet.encode_binary(); // supports_binary = true // supports_binary = true
-        assert_eq!(encoded, String::from("4Hello world!").into_bytes());
+        let encoded = packet.encode_binary();
+        let mut expected = Vec::from([PLAIN_TEXT_MASK]);
+        expected.extend_from_slice(&String::from("4Hello world!").into_bytes());
+        assert_eq!(encoded, expected);
     }
 
     #[test]
@@ -125,8 +131,10 @@ mod forced_binary_encoding_tests{
             None,
         );
 
-        let encoded = packet.encode_binary(); // supports_binary = true // supports_binary = true
-        assert_eq!(encoded, String::from("0").into_bytes());
+        let encoded = packet.encode_binary();
+        let mut expected = Vec::from([PLAIN_TEXT_MASK]);
+        expected.extend_from_slice(&String::from("0").into_bytes());
+        assert_eq!(encoded, expected);
     }
 }
 
@@ -142,14 +150,12 @@ mod payload_encoding_tests{
             None,
         );
         let packets = (0..20).map(|_| packet1.clone()).collect::<Vec<Packet>>();
-        let encoded_payload = Packet::encode_payload(&packets, true);
+        let encoded_payload = Packet::encode_payload(&packets);
 
         // Should be a
-        let mut expected_payload: BinaryType = Vec::new();
+        let mut expected_payload = String::new();
         for _ in 0..20{
-            expected_payload.push(PLAIN_TEXT_MASK);
-            expected_payload.extend_from_slice(String::from("2").as_bytes());
-            expected_payload.push(SEPARATOR_BYTE);
+            expected_payload.push_str(&format!("2{}", SEPARATOR_BYTE as char));
         }
         expected_payload.pop();
         assert_eq!(encoded_payload, expected_payload);
@@ -172,18 +178,18 @@ mod payload_encoding_tests{
         let mut packets = vec![];
         for _ in 0..20 { packets.extend_from_slice(&vec![packet1.clone(), packet2.clone()]) }
 
-        let encoded_payload = Packet::encode_payload(&packets, true);
+        let encoded_payload = Packet::encode_payload(&packets);
 
-        let mut expected_payload: BinaryType = vec![];
+        let mut expected_payload= String::new();
         for _ in 0..20{
             // Packet 1
-            expected_payload.push(BINARY_MASK);
-            expected_payload.extend_from_slice(&vec![1,2,3]);
-            expected_payload.push(SEPARATOR_BYTE);
+            expected_payload.push_str("b4");
+            expected_payload.push_str(&general_purpose::URL_SAFE.encode(vec![1,2,3]));
+            expected_payload.push(SEPARATOR_BYTE as char);
             // Packet 2
-            expected_payload.push(PLAIN_TEXT_MASK);
-            expected_payload.extend_from_slice(String::from("2Ping").as_bytes());
-            expected_payload.push(SEPARATOR_BYTE);
+            expected_payload.push(packet2._type.as_char());
+            expected_payload.push_str("Ping");
+            expected_payload.push(SEPARATOR_BYTE as char);
         }
         expected_payload.pop();
 
@@ -200,13 +206,13 @@ mod payload_encoding_tests{
         );
 
         let packets = (0..20).map(|_| packet1.clone()).collect::<Vec<Packet>>();
-        let encoded_payload = Packet::encode_payload(&packets, true);
+        let encoded_payload = Packet::encode_payload(&packets);
 
-        let mut expected_payload: BinaryType = vec![];
+        let mut expected_payload = String::new();
         for _ in 0..20{
-            expected_payload.push(BINARY_MASK);
-            expected_payload.extend_from_slice(&(0..i16::MAX).map(|_| 0x44).collect::<Vec<u8>>());
-            expected_payload.push(SEPARATOR_BYTE);
+            expected_payload.push_str("b2");
+            expected_payload.push_str(&general_purpose::URL_SAFE.encode((0..i16::MAX).map(|_| 0x44).collect::<Vec<u8>>()));
+            expected_payload.push(SEPARATOR_BYTE as char);
         }
         expected_payload.pop();
         assert_eq!(encoded_payload, expected_payload);
@@ -222,13 +228,13 @@ mod payload_encoding_tests{
         );
 
         let packets = (0..i16::MAX).map(|_| packet1.clone()).collect::<Vec<Packet>>();
-        let encoded_payload = Packet::encode_payload(&packets, true);
+        let encoded_payload = Packet::encode_payload(&packets);
 
-        let mut expected_payload: BinaryType = vec![];
+        let mut expected_payload = String::new();
         for _ in 0..i16::MAX{
-            expected_payload.push(BINARY_MASK);
-            expected_payload.extend_from_slice(&(0..20).map(|_| 0x44).collect::<Vec<u8>>());
-            expected_payload.push(SEPARATOR_BYTE);
+            expected_payload.push_str("b2");
+            expected_payload.push_str(&general_purpose::URL_SAFE.encode((0..20).map(|_| 0x44).collect::<Vec<u8>>()));
+            expected_payload.push(SEPARATOR_BYTE as char);
         }
         expected_payload.pop();
         assert_eq!(encoded_payload, expected_payload);
@@ -239,9 +245,9 @@ mod payload_encoding_tests{
     #[test]
     fn encode_empty_payload() {
         let packets: Vec<Packet> = Vec::new();
-        let encoded_payload = Packet::encode_payload(&packets, true);
+        let encoded_payload = Packet::encode_payload(&packets);
 
-        assert!(encoded_payload.is_empty()); // Should result in an empty payload
+        assert!(encoded_payload.is_empty());
     }
 }
 
@@ -265,8 +271,9 @@ mod encoding_stream_tests{
         let mut count = 0;
         while let Some(encoded) = encoding_stream.next().await {
             assert!(!encoded.is_empty(), "Encoded packet should not be empty");
-            assert_eq!(encoded[0], 6, "First byte should be 6 -> (Category byte + 5 bytes for Hello");
-            assert_eq!(&encoded[1..], "4Hello".as_bytes(), "Last bytes should be \"Hello\" as bytes");
+            assert_eq!(encoded[0], 7, "First byte should be 7 -> (Mask + Category byte + 5 bytes for Hello");
+            assert_eq!(encoded[1], PLAIN_TEXT_MASK, "Second byte should be the text mask");
+            assert_eq!(&encoded[2..], "4Hello".as_bytes(), "Last bytes should be \"Hello\" as bytes");
             count += 1;
             if count == 20 { break; }
         }
@@ -288,8 +295,9 @@ mod encoding_stream_tests{
         let mut count = 0;
         while let Some(encoded) = encoding_stream.next().await {
             assert!(!encoded.is_empty(), "Encoded packet should not be empty");
-            assert_eq!(encoded[0], 1, "First byte should be 1");
-            assert_eq!(encoded[1], 50, "Second byte should be '2' as a byte");
+            assert_eq!(encoded[0], 2, "First byte should be 2 (Mask & Identifier)");
+            assert_eq!(encoded[1], PLAIN_TEXT_MASK, "Second byte should be the text mask");
+            assert_eq!(encoded[2], 50, "Third byte should be '2' as a byte");
             count += 1;
             if count == 20 { break; }
         }
@@ -303,17 +311,28 @@ mod encoding_stream_tests{
             .map(|_| Packet::new(
                 PacketType::Message,
                 None,
-                Some(RawData::Binary((0..i16::MAX).map(|_| 4).collect::<Vec<u8>>()))
+                Some(RawData::Binary((0..i16::MAX).map(|_| 0x44).collect::<Vec<u8>>()))
             ))
             .collect::<Vec<Packet>>();
         let mut encoding_stream = PacketEncoderStream::new(
             stream::iter(packets)
         );
 
+        let data_length = i16::MAX as i32;
         let mut count = 0;
         while let Some(encoded) = encoding_stream.next().await {
             assert!(!encoded.is_empty(), "Encoded packet should not be empty");
-            assert_eq!(encoded.len() as i32, i16::MAX as i32 + 3);
+            // 3 bit header + Binary Mask + packet type +  data_length data
+            assert_eq!(encoded.len() as i32, data_length + 5);
+
+            assert_eq!(encoded[0], 126 | BINARY_MASK);
+            assert_eq!(encoded[1], ((data_length + 2) >> 8) as u8);
+            assert_eq!(encoded[2], (data_length + 2) as u8);
+
+            assert_eq!(encoded[3], BINARY_MASK);
+            assert_eq!(encoded[4], PacketType::Message.as_char() as u8);
+            assert_eq!(encoded[5..], (0..data_length).map(|_| 0x44).collect::<Vec<u8>>());
+
             count += 1;
             if count == 20 { break; }
         }
@@ -335,6 +354,12 @@ mod encoding_stream_tests{
         let mut count = 0;
         while let Some(encoded) = encoding_stream.next().await {
             assert!(!encoded.is_empty(), "Encoded packet should not be empty");
+            // 1 bit header + TEXT_MASK + Message Type + 5 bit "Hello"
+            assert_eq!(encoded.len(), 1 + 1 + 1 + 5);
+            assert_eq!(encoded[0], 7);
+            assert_eq!(encoded[1], PLAIN_TEXT_MASK);
+            assert_eq!(encoded[2], '4' as u8);
+            assert_eq!(encoded[3..], Vec::from("Hello".as_bytes()));
             count += 1;
             if count == i16::MAX { break; }
         }
@@ -357,6 +382,12 @@ mod encoding_stream_tests{
         let mut count = 0;
         while let Some(encoded) = encoder.next().await {
             assert!(!encoded.is_empty(), "Encoded packet should not be empty");
+            // 1 bit header + TEXT_MASK + Message Type + 5 bit "Async"
+            assert_eq!(encoded.len(), 1 + 1 + 1 + 5);
+            assert_eq!(encoded[0], 7);
+            assert_eq!(encoded[1], PLAIN_TEXT_MASK);
+            assert_eq!(encoded[2], '4' as u8);
+            assert_eq!(encoded[3..], Vec::from("Async".as_bytes()));
             count += 1;
             if count >= 3 { break; } // Prevent infinite test execution
         }
