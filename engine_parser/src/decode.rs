@@ -5,65 +5,86 @@ use crate::packet::{Packet, PacketType};
 
 impl Packet {
     pub fn decode(encoded_packet: RawData) -> Self {
+        let packet_len = encoded_packet.len();
+        if packet_len == 0 {
+            return Self::new(PacketType::Noop, None, None);
+        }
         match encoded_packet {
-            RawData::Binary(data) => Self {
-                _type: PacketType::Message,
-                options: None,
-                data: Some(RawData::Binary(data)),
+            RawData::Binary(data) => {
+                match data[0] {
+                    BINARY_MASK => {
+                        if let Some(packet_type) = PacketType::from_char(char::from(data[1])) {
+                            Self {
+                                _type: packet_type,
+                                options: None,
+                                data: if data.len() < 3 { None } else {
+                                    Some(RawData::Binary(Vec::from(&data[2..])))
+                                },
+                            }
+                        } else {
+                            return Packet::error("Invalid binary packet type flag");
+                        }
+                    },
+                    PLAIN_TEXT_MASK => {
+                        let encoded = String::from_utf8(Vec::from(&data[1..]));
+                        return if let Err(e) = encoded {
+                            Packet::error(&format!("Binary parsing error: {:?}", e))
+                        } else {
+                            Packet::decode(RawData::Text(encoded.unwrap()))
+                        }
+                    },
+                    _ => { Self::error("Invalid binary packet - missing association flag") }
+                }
             },
             RawData::Text(s) => {
                 let mut chars = s.chars();
-                if let Some(first_char) = chars.next() {
-                    if first_char == 'b' {
-                        let data = general_purpose::URL_SAFE.decode(&s[1..]);
-                        return if let Ok(data) = data {
-                            Self {
-                                _type: PacketType::Message,
-                                options: None,
-                                data: Some(RawData::Binary(data)),
+                match chars.nth(0) {
+                    Some('b') => {
+                        if let Some(packet_type) = PacketType::from_char(chars.nth(0).unwrap_or('X')) {
+                            if packet_len == 2 { return Self::new(packet_type, None, None); }
+
+                            if let Ok(data) = general_purpose::URL_SAFE.decode(&s[2..]) {
+                                return Self {
+                                    _type: packet_type,
+                                    options: None,
+                                    data: Some(RawData::Binary(data)),
+                                };
                             }
-                        } else {
-                            Self::error("Invalid base64 decoding")
+                            return Self::error("Invalid base64 encoding of binary data");
                         }
-                    }
-                    if let Some(packet_type) = PacketType::from_char(first_char) {
-                        return Self {
-                            _type: packet_type,
-                            options: None,
-                            data: if s.len() <= 1 { None } else {
-                                Some(RawData::Text(s[1..].to_string()))
-                            },
-                        };
-                    }
+                        Packet::error("Invalid packet type flag on encoded data")
+                    },
+                    Some(c) => {
+                        if let Some(packet_type) = PacketType::from_char(c) {
+                            return Self {
+                                _type: packet_type,
+                                options: None,
+                                data: if s.len() < 2 { None } else {
+                                    Some(RawData::Text(s[1..].to_string()))
+                                }
+                            }
+                        }
+                        Self::error("Invalid packet type for text encoded data")
+                    },
+                    None => Self::error("Invalid format for text encoded data")
                 }
-                Self::error("Invalid raw text data for packet")
             }
         }
     }
 
-    pub fn decode_payload(encoded: &[u8]) -> Vec<Self> {
+    pub fn decode_payload(encoded: String) -> Vec<Self> {
+        // println!("{:?}", encoded);
         if encoded.is_empty() { return Vec::new(); }
 
-        let chunks: Vec<&[u8]> = encoded.split(|&b| b == SEPARATOR_BYTE).collect();
+        let chunks: Vec<String> = encoded
+            .split(char::from(SEPARATOR_BYTE))
+            .map(|s| s.to_owned())
+            .collect();
+        // println!("{:?}", chunks);
         let mut payload = Vec::<Self>::with_capacity(chunks.len());
 
         for chunk in chunks.iter() {
-            let data_type = chunk[0]; // First byte determines type
-            let data = &chunk[1..]; // Rest is the actual data
-
-            let decoded = match data_type {
-                PLAIN_TEXT_MASK => {
-                    let text = String::from_utf8(data.to_vec());
-                    if text.is_err() { break; }
-                    Self::decode(RawData::Text(text.unwrap()))
-                },
-                BINARY_MASK => {
-                    Self::decode(RawData::Binary(data.to_vec()))
-                },
-                _ => {
-                    break;
-                }
-            };
+            let decoded = Self::decode(RawData::Text(chunk.into()));
             payload.push(decoded);
         }
         payload

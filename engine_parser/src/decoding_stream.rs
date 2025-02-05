@@ -3,7 +3,7 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 use futures::Stream;
 use pin_project::pin_project;
-
+use crate::BinaryType;
 use crate::constants::{RawData, BINARY_MASK, PLAIN_TEXT_MASK};
 use crate::packet::Packet;
 
@@ -27,7 +27,7 @@ enum State {
 
 impl<S> PacketDecoderStream<S>
 where
-    S: Stream<Item = Vec<u8>>,
+    S: Stream<Item = BinaryType>,
 {
     pub fn new(stream: S) -> Self {
         Self {
@@ -41,11 +41,11 @@ where
 
 }
 
-fn total_length(chunks: &VecDeque<Vec<u8>>) -> usize {
+fn total_length(chunks: &VecDeque<BinaryType>) -> usize {
     chunks.iter().map(|chunk| chunk.len()).sum()
 }
 
-fn concat_chunks(chunks: &mut VecDeque<Vec<u8>>, size: usize) -> Vec<u8> {
+fn concat_chunks(chunks: &mut VecDeque<BinaryType>, size: usize) -> BinaryType {
     let mut result = Vec::with_capacity(size);
     while result.len() < size {
         if let Some(chunk) = chunks.pop_front() {
@@ -57,12 +57,12 @@ fn concat_chunks(chunks: &mut VecDeque<Vec<u8>>, size: usize) -> Vec<u8> {
 
 impl<S> Stream for PacketDecoderStream<S>
 where
-    S: Stream<Item = Vec<u8>>,
+    S: Stream<Item = BinaryType>,
 {
     type Item = Packet;
 
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        let this = self.as_mut().project();
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let this = self.project();
         match this.stream.poll_next(cx) {
             Poll::Ready(Some(chunk)) => {
                 this.chunks.push_back(chunk);
