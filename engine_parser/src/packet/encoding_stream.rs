@@ -3,7 +3,7 @@ use std::task::{Context, Poll};
 use futures::Stream;
 use pin_project::pin_project;
 
-use crate::packet::Packet;
+use super::Packet;
 use crate::constants::{RawData, BINARY_MASK, BinaryType};
 
 #[pin_project]

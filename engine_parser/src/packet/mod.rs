@@ -1,7 +1,13 @@
+mod encode;
+mod decode;
+mod encoding_stream;
+mod decoding_stream;
+
 use crate::constants::RawData;
 
-pub use crate::encoding_stream::PacketEncoderStream;
-pub use crate::decoding_stream::PacketDecoderStream;
+pub use encoding_stream::PacketEncoderStream;
+pub use decoding_stream::PacketDecoderStream;
+
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PacketType {

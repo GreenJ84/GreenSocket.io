@@ -1,7 +1,7 @@
 use base64::{Engine as _, engine::general_purpose};
 
-use crate::constants::{RawData, SEPARATOR_BYTE, BINARY_MASK, PLAIN_TEXT_MASK};
-use crate::packet::{Packet, PacketType};
+use crate::constants::*;
+use super::{Packet, PacketType};
 
 impl Packet {
     pub fn decode(encoded_packet: RawData) -> Self {

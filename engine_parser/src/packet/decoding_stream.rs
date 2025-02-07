@@ -3,9 +3,9 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 use futures::Stream;
 use pin_project::pin_project;
-use crate::BinaryType;
-use crate::constants::{RawData, BINARY_MASK, PLAIN_TEXT_MASK};
-use crate::packet::Packet;
+
+use crate::constants::*;
+use super::Packet;
 
 #[pin_project]
 #[derive(Debug)]

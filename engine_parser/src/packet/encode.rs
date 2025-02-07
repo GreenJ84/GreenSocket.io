@@ -1,7 +1,7 @@
 use base64::{Engine as _, engine::general_purpose};
 
-use crate::constants::{RawData, SEPARATOR_BYTE, BINARY_MASK, PLAIN_TEXT_MASK, BinaryType};
-use crate::packet::Packet;
+use crate::constants::*;
+use super::Packet;
 
 impl Packet {
     /// Binary Data encoding always has:
