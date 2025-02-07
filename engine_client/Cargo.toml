@@ -1,5 +1,5 @@
 [package]
-name = "enginer_client"
+name = "engine_client"
 version = "0.1.0"
 authors = ["Jesse Greenough <jesse.greenough84@gmail.com>"]
 edition = "2018"
