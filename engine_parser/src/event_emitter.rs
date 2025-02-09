@@ -1,15 +1,15 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-/// Type alias for event listeners (Vec of callbacks)
-type Listener = Arc<dyn Fn(&str) + Send + Sync>;
+
+pub type Listener = Arc<dyn Fn(&str) + Send + Sync>;
 pub enum EventError {
     MaxedEventListeners,
     ListenerNotFound,
     EventNotFound
 }
 
-pub trait EventEmitter {
+pub trait EventHandler {
     fn event_names(&self) -> Vec<String>;
 
     fn add_listener(&mut self, event_name: &str, callback: Listener) -> Result<(), EventError>;
@@ -24,12 +24,12 @@ pub trait EventEmitter {
     fn listener_count(&self, event_name: &str) -> Result<usize, EventError>;
 }
 
-pub struct EventManager {
+pub struct EventEmitter {
     max_listeners: usize,
     listeners: Arc<Mutex<HashMap<String, Vec<Listener>>>>,
 }
 
-impl EventManager {
+impl EventEmitter {
     pub fn new() -> Self {
         Self {
             max_listeners: 10usize,
@@ -38,7 +38,7 @@ impl EventManager {
     }
 }
 
-impl EventEmitter for EventManager {
+impl EventHandler for EventEmitter {
     fn event_names(&self) -> Vec<String> {
         self.listeners.lock().unwrap().keys().map(|k| k.to_owned()).collect::<Vec<String>>()
     }
