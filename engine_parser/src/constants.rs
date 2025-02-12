@@ -18,4 +18,16 @@ impl RawData {
             RawData::Text(s) => s.len(),
         }
     }
+    pub fn is_binary(&self) -> bool{
+        match self {
+            RawData::Binary(_) => true,
+            RawData::Text(_) => false,
+        }
+    }
+    pub fn is_text(&self) -> bool{
+        match self {
+            RawData::Binary(_) => false,
+            RawData::Text(_) => true,
+        }
+    }
 }
