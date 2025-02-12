@@ -57,17 +57,30 @@ impl Packet {
         res
     }
 
-    pub fn encode_payload(packets: &[Self]) -> String {
+    pub fn encode_payload(packets: &[Self], supports_binary: bool) -> RawData {
         let size = packets.len();
-        let mut payload = String::with_capacity(packets.len() * 2);
-        for (i, packet) in packets.iter().enumerate() {
-            if let RawData::Text(encoded) = packet.encode(false) {
-                payload.push_str(&encoded);
-            } else { }
-            if i < size - 1 {
-                payload.push(char::from(SEPARATOR_BYTE));
+        return if supports_binary {
+            let mut payload = String::with_capacity(packets.len() * 2);
+            for (i, packet) in packets.iter().enumerate() {
+                if let Some(RawData::Text(encoded)) = packet.encode(supports_binary) {
+                    payload.push_str(&encoded);
+                }
+                if i < size - 1 {
+                    payload.push(char::from(SEPARATOR_BYTE));
+                }
             }
-        }
-        payload
+            RawData::Text(payload)
+        } else {
+            let mut payload = Vec::<u8>::new();
+            for (i, packet) in packets.iter().enumerate() {
+                if let Some(RawData::Binary(encoded)) = packet.encode(supports_binary) {
+                     payload.extend(&encoded);
+                }
+                if i < size - 1 {
+                    payload.push(SEPARATOR_BYTE);
+                }
+            }
+            RawData::Binary(payload)
+        };
     }
 }
