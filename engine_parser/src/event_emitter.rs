@@ -1,10 +1,21 @@
 use std::collections::HashMap;
+use std::error::Error;
 use std::sync::{Arc, Mutex};
+use crate::packet::Packet;
+use crate::RawData;
 
-
-pub type Listener = Arc<dyn Fn(&str) + Send + Sync>;
+pub type Listener = Arc<dyn Fn(EventPayload) + Send + Sync>;
+#[derive(Debug, Clone)]
+pub enum EventPayload {
+    Packet(Packet),
+    Data(RawData),
+    Msg(String),
+    Error(dyn Error),
+    None
+}
+#[derive(Debug, Clone)]
 pub enum EventError {
-    MaxedEventListeners,
+    OverloadedEventListeners,
     ListenerNotFound,
     EventNotFound
 }
@@ -17,7 +28,12 @@ pub trait EventHandler {
     fn remove_all_listeners(&mut self, event_name: &str) -> Result<(), EventError>;
     fn on(&mut self, event_name: &str, callback: Listener) -> Result<(), EventError>;
     fn off(&mut self, event_name: &str, callback: Listener) -> Result<(), EventError>;
-    fn emit(&self, event_name: &str, msg: &str);
+
+    fn emit(&self, event_name: &str, payload: EventPayload);
+    fn emit_final(&mut self, event_name: &str, payload: EventPayload) -> Result<(), EventError>{
+        self.emit(event_name, payload);
+        self.remove_all_listeners(event_name)
+    }
 
     fn set_max_listeners(&mut self, max: usize);
     fn max_listeners(&self) -> usize;
@@ -83,11 +99,11 @@ impl EventHandler for EventEmitter {
         self.remove_listener(event_name, callback)
     }
 
-    fn emit(&self, event: &str, msg: &str) {
+    fn emit(&self, event: &str, payload: EventPayload) {
         let listeners = self.listeners.lock().unwrap();
         if let Some(callbacks) = listeners.get(event) {
             for callback in callbacks {
-                callback(msg);
+                callback(payload.clone());
             }
         }
     }
