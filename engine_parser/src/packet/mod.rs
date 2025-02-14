@@ -1,12 +1,9 @@
-mod encode;
-mod decode;
-mod encoding_stream;
-mod decoding_stream;
+pub(crate) mod encode;
+pub(crate) mod decode;
+pub(crate) mod encoding_stream;
+pub(crate) mod decoding_stream;
 
 use crate::constants::RawData;
-
-pub use encoding_stream::PacketEncoderStream;
-pub use decoding_stream::PacketDecoderStream;
 
 
 #[derive(Debug, Clone, PartialEq, Eq)]
