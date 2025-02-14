@@ -72,22 +72,41 @@ impl Packet {
         }
     }
 
-    pub fn decode_payload(encoded: String) -> Vec<Self> {
-        // println!("{:?}", encoded);
-        if encoded.is_empty() { return Vec::new(); }
+    pub fn decode_payload(encoded: RawData) -> Vec<Self> {
+        match encoded {
+            RawData::Text(txt) => {
+                if txt.is_empty() { return Vec::new(); }
 
-        let chunks: Vec<String> = encoded
-            .split(char::from(SEPARATOR_BYTE))
-            .map(|s| s.to_owned())
-            .collect();
-        // println!("{:?}", chunks);
-        let mut payload = Vec::<Self>::with_capacity(chunks.len());
+                let chunks: Vec<String> = txt
+                    .split(char::from(SEPARATOR_BYTE))
+                    .map(|s| s.to_owned())
+                    .collect();
+                // println!("{:?}", chunks);
+                let mut payload = Vec::<Self>::with_capacity(chunks.len());
 
-        for chunk in chunks.iter() {
-            let decoded = Self::decode(RawData::Text(chunk.into()));
-            payload.push(decoded);
+                for chunk in chunks.iter() {
+                    let decoded = Self::decode(RawData::Text(chunk.into()));
+                    payload.push(decoded);
+                }
+                payload
+            },
+            RawData::Binary(bin) => {
+                if bin.is_empty() { return Vec::new(); }
+
+                let chunks: Vec<BinaryType> = bin
+                    .split(SEPARATOR_BYTE)
+                    .map(|s| s.to_vec())
+                    .collect();
+                // println!("{:?}", chunks);
+                let mut payload = Vec::<Self>::with_capacity(chunks.len());
+
+                for chunk in chunks.iter() {
+                    let decoded = Self::decode(RawData::Binary(chunk.into()));
+                    payload.push(decoded);
+                }
+                payload
+            }
         }
-        payload
     }
 }
 
