@@ -4,4 +4,20 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+engine_parser = { path = "../engine_parser" }
+
+hyper = { version = "1.6.0", feateures = ["full"] }
+hyper-util = { version = "0.1.10", features = ["full"] }
 ws = { package = "rocket_ws", version = "0.1.1" }
+async-trait = "0.1.85"
+tokio = "1.43.0"
+log = "0.4.25"
+
+http = "1.2.0"
+flate2 = "1.0.35"
+bytes = "1.9.0"
+http-body-util = "0.1.0"
+chrono = "0.4.39"
+serde = { version = "1.0.217", features = ["derive"] }
+url = "2.5.4"
+regex = "1.11.1"
