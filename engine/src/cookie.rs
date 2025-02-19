@@ -1,12 +1,13 @@
 use chrono::{DateTime, NaiveDateTime, TimeZone};
 
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum PriorityLevel {
     Low,
     Medium,
     High
 }
 impl PriorityLevel {
-    pub fn from_str(val: &str) -> Option<Self>{
+    pub fn from_str(val: &str) -> Option<Self> {
         match val {
             "low" => { Some(PriorityLevel::Low) },
             "medium" => { Some(PriorityLevel::Medium) },
@@ -23,6 +24,7 @@ impl PriorityLevel {
     }
 }
 
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum SameSiteSetting {
     Strict,
     Lax,
@@ -47,7 +49,10 @@ impl SameSiteSetting {
 }
 
 /// Basic HTTP cookie parser and serializer for HTTP servers.
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct  CookieSerializeOptions {
+    name: String,
+
     /// Specifies the value for the {@link https://tools.ietf.org/html/rfc6265#section-5.2.3|Domain Set-Cookie attribute}. By default, no
     /// domain is set, and most clients will consider the cookie to apply to only
     /// the current domain.
@@ -57,7 +62,7 @@ pub struct  CookieSerializeOptions {
     /// value of a cookie has a limited character set (and must be a simple
     /// string), this function can be used to encode a value into a string suited
     /// for a cookie's value.
-    encode: dyn Fn(String) -> String,
+    pub encode: dyn Fn(String) -> String,
 
 
     /// Specifies the `Date` object to be the value for the {@link https://tools.ietf.org/html/rfc6265#section-5.2.1|`Expires` `Set-Cookie` attribute}. By default,
@@ -73,7 +78,7 @@ pub struct  CookieSerializeOptions {
     /// not allow client-side JavaScript to see the cookie in `document.cookie`.
     ///
     /// @Default `true`
-    http_only: Option<bool>,
+    http_only: bool,
 
     /// Specifies the number (in seconds) to be the value for the `Max-Age`
     /// `Set-Cookie` attribute. The given number will be converted to an integer
@@ -89,7 +94,7 @@ pub struct  CookieSerializeOptions {
     ///
     /// **note** This is an attribute that has not yet been fully standardized, and may change in the future.
     /// This also means many clients may ignore this attribute until they understand it.
-    partitioned: Option<bool>,
+    partitioned: bool,
 
     /// Specifies the value for the {@link https://tools.ietf.org/html/rfc6265#section-5.2.4|`Path` `Set-Cookie` attribute}.
     /// By default, the path is considered the "default path".
@@ -132,5 +137,83 @@ pub struct  CookieSerializeOptions {
     /// not have an HTTPS connection.
     ///
     /// @Default `false`
-    secure:Option<bool>
+    secure: bool
+}
+impl Default for CookieSerializeOptions {
+    fn default() -> Self {
+        Self {
+            name: String::frpm("greeno"),
+            domain: None,
+            encode: |v| v,
+            expires: None,
+            http_only: true,
+            max_age: None,
+            partitioned: false,
+            path: None,
+            priority: None,
+            same_site: None,
+            secure: false,
+        }
+    }
+}
+impl CookieSerializeOptions {
+    pub fn name(&self) -> &str { &self.name}
+    pub fn set_name(&mut self, name: String) -> &Self {
+        self.name = name;
+        self
+    }
+
+    pub fn domain(&self) -> &Option<String> { &self.domain}
+    pub fn set_domain(&mut self, domain: Option<String>) -> &Self {
+        self.domain = domain;
+        self
+    }
+
+    pub fn expires(&self) -> Option<NaiveDateTime> { self.expires }
+    pub fn set_expires(&mut self, expires: Option<NaiveDateTime>) -> &Self {
+        self.expires = expires;
+        self
+    }
+
+    pub fn http_only(&self) -> bool { self.http_only }
+    pub fn set_http_only(&mut self, http_only: bool) -> &Self {
+        self.http_only = http_only;
+        self
+    }
+
+    pub fn max_age(&self) -> Option<i32> { self.max_age }
+    pub fn set_max_age(&mut self, max_age: Option<i32>) -> &Self {
+        self.max_age = max_age;
+        self
+    }
+
+    pub fn partitioned(&self) -> bool { self.partitioned }
+    pub fn set_partitioned(&mut self, partitioned: bool) -> &Self {
+        self.partitioned = partitioned;
+        self
+    }
+
+    pub fn path(&self) -> &Option<String> { &self.path }
+    pub fn set_path(&mut self, path: Option<String>) -> &Self {
+        self.path = path;
+        self
+    }
+
+    pub fn priority(&self) -> &Option<PriorityLevel> { &self.priority }
+    pub fn set_priority(&mut self, priority: Option<PriorityLevel>) -> &Self {
+        self.priority = priority;
+        self
+    }
+
+    pub fn same_site(&self) -> &Option<SameSiteSetting> { &self.same_site }
+    pub fn set_same_site(&mut self, same_site: Option<SameSiteSetting>) -> &Self {
+        self.same_site = same_site;
+        self
+    }
+
+    pub fn secure(&self) -> bool { self.secure }
+    pub fn set_secure(&mut self, secure: bool) -> &Self{
+        self.secure = secure;
+        self
+    }
 }
