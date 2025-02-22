@@ -3,9 +3,6 @@ members = [
     "engine",
     "engine_client",
     "engine_parser",
-    "socket",
-    "socket_client",
-    "socket_parser",
 ]
 resolver = "2"
 
