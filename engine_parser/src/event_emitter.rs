@@ -1,18 +1,33 @@
-use std::collections::HashMap;
-use std::error::Error;
-use std::sync::{Arc, Mutex};
-use crate::packet::Packet;
-use crate::RawData;
+use std::sync::Arc;
+use dashmap::DashMap;
+use futures::future::BoxFuture;
 
-pub type Listener = Arc<dyn Fn(EventPayload) + Send + Sync>;
+pub type EventPayload<T: Send + Sync> = Arc<T>;
+pub type Callback<T: Send + Sync> = Arc<dyn Fn(EventPayload<T>) + Send + Sync>;
 #[derive(Debug, Clone)]
-pub enum EventPayload {
-    Packet(Packet),
-    Data(RawData),
-    Msg(String),
-    Error(dyn Error),
-    None
+pub struct Listener<T> {
+    callback: Callback<T>,
+    lifetime: Option<u64>,
 }
+impl<T> Listener<T> {
+    pub fn new<T>(callback: Arc<Callback<T>>, lifetime: Option<u64>) -> Self {
+        Self { callback, lifetime }
+    }
+    pub fn call<T>(&self, payload: EventPayload<T>){
+        self.callback(payload);
+        if let Some(mut lifetime) = self.lifetime{
+            *lifetime -= 1;
+        }
+    }
+}
+
+impl<T> PartialEq<Self> for Listener<T> {
+    fn eq(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.callback, &other.callback)
+    }
+}
+impl<T> Eq for Listener<T>{}
+
 #[derive(Debug, Clone)]
 pub enum EventError {
     /// Trying to add more than `max_listeners`to an Event.
@@ -28,16 +43,32 @@ pub enum EventError {
 pub trait EventHandler<T> {
     fn event_names(&self) -> Vec<String>;
 
-    fn add_listener(&mut self, event_name: &str, callback: Listener) -> Result<(), EventError>;
-    fn remove_listener(&mut self, event_name: &str, callback: Listener) -> Result<(), EventError>;
+    /// Infinite Listener
+    fn add_listener<T: Send + Sync>(&mut self, event_name: &str, callback: Listener<T>) -> Result<(), EventError>;
+    fn on<T: Send + Sync>(&mut self, event_name: &str, callback: Listener<T>) -> Result<(), EventError>;
+    /// Finite Listener
+    fn add_limited_listener<T: Send + Sync>(&mut self, event_name: &str, callback: Listener<T>) -> Result<(), EventError>;
+    fn on_limited<T: Send + Sync>(&mut self, event_name: &str, callback: Listener<T>) -> Result<(), EventError>;
+    /// Single Instance Listener
+    fn once<T: Send + Sync>(&mut self, event_name: &str, callback: Listener<T>) -> Result<(), EventError>;
+    /// Remove an active listener for an Event
+    fn remove_listener<T: Send + Sync>(&mut self, event_name: &str, callback: Listener<T>) -> Result<(), EventError>;
+    fn off<T: Send + Sync>(&mut self, event_name: &str, callback: Listener<T>) -> Result<(), EventError>;
+    /// Remove all Listeners for an Event
     fn remove_all_listeners(&mut self, event_name: &str) -> Result<(), EventError>;
-    fn on(&mut self, event_name: &str, callback: Listener) -> Result<(), EventError>;
-    fn off(&mut self, event_name: &str, callback: Listener) -> Result<(), EventError>;
 
-    fn emit(&self, event_name: &str, payload: EventPayload);
-    fn emit_final(&mut self, event_name: &str, payload: EventPayload) -> Result<(), EventError>{
+    fn emit<T: Send + Sync>(&self, event_name: &str, payload: EventPayload<T>);
+    async fn emit_async<T: Send + Sync>(&self, event_name: &str, payload: EventPayload<T>);
+
+    fn emit_final<T: Send + Sync>(&mut self, event_name: &str, payload: EventPayload<T>) -> Result<(), EventError>{
         self.emit(event_name, payload);
         self.remove_all_listeners(event_name)
+    }
+    fn emit_final_async<T: Send + Sync>(&mut self, event_name: &str, payload: EventPayload<T>) -> BoxFuture<'_, Result<(), EventError>> {
+        Box::pin(async move {
+            self.emit_async(event_name, payload).await;
+            self.remove_all_listeners(event_name)
+        })
     }
 
     fn set_max_listeners(&mut self, max: usize);
