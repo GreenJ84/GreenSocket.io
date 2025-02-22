@@ -15,12 +15,17 @@ pub enum EventPayload {
 }
 #[derive(Debug, Clone)]
 pub enum EventError {
-    OverloadedEventListeners,
+    /// Trying to add more than `max_listeners`to an Event.
+    OverloadedEvent,
+    /// Trying to delete a `Listener` that cannot be found.
     ListenerNotFound,
-    EventNotFound
+    /// Trying to delete an `Event` that cannot be found.
+    EventNotFound,
+    /// Any other possible Errors during Event Handling
+    Other(Box<dyn std::error::Error + Send + Sync>),
 }
 
-pub trait EventHandler {
+pub trait EventHandler<T> {
     fn event_names(&self) -> Vec<String>;
 
     fn add_listener(&mut self, event_name: &str, callback: Listener) -> Result<(), EventError>;
