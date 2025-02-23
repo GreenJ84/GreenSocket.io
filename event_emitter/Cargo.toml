@@ -1,0 +1,11 @@
+[package]
+name = "event_emitter"
+version = "0.1.0"
+edition = "2021"
+authors.workspace = true
+description.workspace = true
+
+[dependencies]
+tokio = "1.43.0"
+dashmap = "7.0.0-rc1"
+futures = "0.3.31"
