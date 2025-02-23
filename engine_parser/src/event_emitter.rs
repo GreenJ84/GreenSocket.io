@@ -76,86 +76,110 @@ pub trait EventHandler<T> {
     fn listener_count(&self, event_name: &str) -> Result<usize, EventError>;
 }
 
-pub struct EventEmitter {
+#[derive(Default, Debug, Clone)]
+pub struct EventEmitter<T> {
     max_listeners: usize,
-    listeners: Arc<Mutex<HashMap<String, Vec<Listener>>>>,
+    listeners: Arc<DashMap<String, Vec<Listener<T>>>>,
 }
-
-impl EventEmitter {
+impl<T> EventEmitter<T>{
     pub fn new() -> Self {
         Self {
             max_listeners: 10usize,
-            listeners: Arc::new(Mutex::new(HashMap::new())),
+            listeners: Arc::new(DashMap::new()),
         }
     }
 }
 
-impl EventHandler for EventEmitter {
+impl<T> EventHandler<T> for EventEmitter<T> {
     fn event_names(&self) -> Vec<String> {
-        self.listeners.lock().unwrap().keys().map(|k| k.to_owned()).collect::<Vec<String>>()
+        self.listeners.iter().map(|entry| entry.key().clone()).collect()
     }
 
-    fn add_listener(&mut self, event_name: &str, callback: Listener) -> Result<(), EventError>{
-        let mut listeners = self.listeners.lock().unwrap();
-        let event_listeners = listeners
-            .entry(event_name.to_string())
-            .or_insert(Vec::<Listener>::with_capacity(self.max_listeners));
-        if event_listeners.len() < self.max_listeners {
-            event_listeners.push(callback);
-            return Ok(())
+    fn add_listener<T: Send + Sync>(&mut self, event_name: &str, callback: Listener<T>) -> Result<(), EventError> {
+        let mut entry = self.listeners.entry(event_name.to_string()).or_default();
+        if entry.len() < self.max_listeners {
+            entry.push(callback);
+            Ok(())
+        } else {
+            Err(EventError::OverloadedEvent)
         }
-        Err(EventError::MaxedEventListeners)
     }
-    fn remove_listener(&mut self, event_name: &str, callback: Listener) -> Result<(), EventError>{
-        let mut listeners = self.listeners.lock().unwrap();
-        if let Some(event_listeners) = listeners.get_mut(event_name){
-            let original_len = event_listeners.len();
-            event_listeners.retain(|listener| !Arc::ptr_eq(listener, &callback));
 
-            return if event_listeners.len() < original_len {
+    fn on<T: Send + Sync>(&mut self, event_name: &str, callback: Listener<T>) -> Result<(), EventError> {
+        self.add_listener(event_name, callback)
+    }
+
+    fn add_limited_listener<T: Send + Sync>(&mut self, event_name: &str, callback: Listener<T>) -> Result<(), EventError> {
+        todo!()
+    }
+
+    fn on_limited<T: Send + Sync>(&mut self, event_name: &str, callback: Listener<T>) -> Result<(), EventError> {
+        todo!()
+    }
+
+    fn once<T: Send + Sync>(&mut self, event_name: &str, callback: Listener<T>) -> Result<(), EventError> {
+        let mut entry = self.listeners.entry(event_name.to_string()).or_default();
+        if entry.len() < self.max_listeners {
+            entry.push(callback);
+            Ok(())
+        } else {
+            Err(EventError::OverloadedEvent)
+        }
+    }
+
+    fn remove_listener<T: Send + Sync>(&mut self, event_name: &str, callback: &Listener<T>) -> Result<(), EventError> {
+        if let Some(mut entry) = self.listeners.get_mut(event_name) {
+            let original_len = entry.len();
+            entry.retain(|listener| !Arc::ptr_eq(listener, callback));
+
+            return if entry.len() < original_len {
                 Ok(())
             } else {
                 Err(EventError::ListenerNotFound)
-            }
+            };
         }
         Err(EventError::EventNotFound)
     }
-    fn remove_all_listeners(&mut self, event_name: &str) -> Result<(), EventError>{
-        let mut listeners = self.listeners.lock().unwrap();
-        if let Some(event_listeners) = listeners.get_mut(event_name){
-            event_listeners.clear();
-            return Ok(())
-        }
-        Err(EventError::EventNotFound)
-    }
-    fn on(&mut self, event_name: &str, callback: Listener) -> Result<(), EventError> {
-        self.add_listener(event_name, callback)
-    }
-    fn off(&mut self, event_name: &str, callback: Listener) -> Result<(), EventError> {
+
+    fn off<T: Send + Sync>(&mut self, event_name: &str, callback: &Listener<T>) -> Result<(), EventError> {
         self.remove_listener(event_name, callback)
     }
 
-    fn emit(&self, event: &str, payload: EventPayload) {
-        let listeners = self.listeners.lock().unwrap();
-        if let Some(callbacks) = listeners.get(event) {
-            for callback in callbacks {
-                callback(payload.clone());
+    fn remove_all_listeners(&mut self, event_name: &str) -> Result<(), EventError> {
+        if self.listeners.remove(event_name).is_some() {
+            Ok(())
+        } else {
+            Err(EventError::EventNotFound)
+        }
+    }
+
+    fn emit<T: Send + Sync>(&self, event_name: &str, payload: EventPayload<T>) {
+        if let Some(entry) = self.listeners.get(event_name) {
+            for listener in entry.iter() {
+                listener.callback(payload.clone());
             }
         }
+    }
+
+    async fn emit_async<T: Send + Sync>(&self, event_name: &str, payload: EventPayload<T>) {
+        let clone = self.clone();
+        tokio::spawn(async move {
+            clone.emit(event_name, payload);
+        });
     }
 
     fn set_max_listeners(&mut self, max: usize) {
         self.max_listeners = max;
     }
+
     fn max_listeners(&self) -> usize {
         self.max_listeners
     }
-    fn listener_count(&self, event_name: &str) -> Result<usize, EventError> {
-        let listeners = self.listeners.lock().unwrap();
-        if let Some(event_listeners) = listeners.get(event_name) {
-            return Ok(event_listeners.len());
-        }
-        Err(EventError::EventNotFound)
-    }
 
+    fn listener_count(&self, event_name: &str) -> Result<usize, EventError> {
+        self.listeners
+            .get(event_name)
+            .map(|entry| entry.len())
+            .ok_or(EventError::EventNotFound)
+    }
 }
