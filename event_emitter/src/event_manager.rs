@@ -4,13 +4,15 @@ use crate::event_handler::EventHandler;
 use crate::{EventError, EventPayload};
 use crate::listener::Listener;
 
+pub type EventManager<T> = Arc<EventEmitter<T>>;
+
 /// A struct intended to handle the implementations of reacting to Events
-#[derive(Default, Debug, Clone)]
-pub struct EventManager<T> {
+#[derive(Default, Clone)]
+struct EventEmitter<T> where T: Send + Sync + Clone  {
     max_listeners: usize,
     listeners: Arc<DashMap<String, Vec<Listener<T>>>>,
 }
-impl<T> EventManager<T>{
+impl<T: Send + Sync + Clone> EventEmitter<T>{
     pub fn new() -> Self {
         Self {
             max_listeners: 10usize,
@@ -18,13 +20,12 @@ impl<T> EventManager<T>{
         }
     }
 }
-
-impl<T> EventHandler<T> for EventManager<T> {
+impl<T: Send+ Sync + Clone + 'static> EventHandler<T> for EventEmitter<T> {
     fn event_names(&self) -> Vec<String> {
         self.listeners.iter().map(|entry| entry.key().clone()).collect()
     }
 
-    fn add_listener<T: Send + Sync>(&mut self, event_name: &str, callback: Listener<T>) -> Result<(), EventError> {
+    fn add_listener(&mut self, event_name: &str, callback: Listener<T>) -> Result<(), EventError> {
         let mut entry = self.listeners.entry(event_name.to_string()).or_default();
         if entry.len() < self.max_listeners {
             entry.push(callback);
@@ -34,19 +35,19 @@ impl<T> EventHandler<T> for EventManager<T> {
         }
     }
 
-    fn on<T: Send + Sync>(&mut self, event_name: &str, callback: Listener<T>) -> Result<(), EventError> {
+    fn on(&mut self, event_name: &str, callback: Listener<T>) -> Result<(), EventError> {
         self.add_listener(event_name, callback)
     }
 
-    fn add_limited_listener<T: Send + Sync>(&mut self, event_name: &str, callback: Listener<T>) -> Result<(), EventError> {
+    fn add_limited_listener(&mut self, event_name: &str, callback: Listener<T>) -> Result<(), EventError> {
         todo!()
     }
 
-    fn on_limited<T: Send + Sync>(&mut self, event_name: &str, callback: Listener<T>) -> Result<(), EventError> {
+    fn on_limited(&mut self, event_name: &str, callback: Listener<T>, limit: u64) -> Result<(), EventError> {
         todo!()
     }
 
-    fn once<T: Send + Sync>(&mut self, event_name: &str, callback: Listener<T>) -> Result<(), EventError> {
+    fn once(&mut self, event_name: &str, callback: Listener<T>) -> Result<(), EventError> {
         let mut entry = self.listeners.entry(event_name.to_string()).or_default();
         if entry.len() < self.max_listeners {
             entry.push(callback);
@@ -56,10 +57,10 @@ impl<T> EventHandler<T> for EventManager<T> {
         }
     }
 
-    fn remove_listener<T: Send + Sync>(&mut self, event_name: &str, callback: &Listener<T>) -> Result<(), EventError> {
+    fn remove_listener(&mut self, event_name: &str, callback: &Listener<T>) -> Result<(), EventError> {
         if let Some(mut entry) = self.listeners.get_mut(event_name) {
             let original_len = entry.len();
-            entry.retain(|listener| !Arc::ptr_eq(listener, callback));
+            entry.retain(|listener| !listener.eq(callback));
 
             return if entry.len() < original_len {
                 Ok(())
@@ -70,7 +71,7 @@ impl<T> EventHandler<T> for EventManager<T> {
         Err(EventError::EventNotFound)
     }
 
-    fn off<T: Send + Sync>(&mut self, event_name: &str, callback: &Listener<T>) -> Result<(), EventError> {
+    fn off(&mut self, event_name: &str, callback: &Listener<T>) -> Result<(), EventError> {
         self.remove_listener(event_name, callback)
     }
 
@@ -82,18 +83,31 @@ impl<T> EventHandler<T> for EventManager<T> {
         }
     }
 
-    fn emit<T: Send + Sync>(&self, event_name: &str, payload: EventPayload<T>) {
+    fn emit(&mut self, event_name: &str, payload: EventPayload<T>) {
         if let Some(entry) = self.listeners.get(event_name) {
             for listener in entry.iter() {
-                listener.callback(payload.clone());
+                let mut _self = self.clone();
+                let payload = payload.clone();
+                let listener = listener.clone();
+                let event_name = event_name.to_string();
+                tokio::spawn(async move {
+                    listener.call(payload);
+                    if listener.at_limit() {
+                        _self.remove_listener(&event_name, &listener).map_err(|_|{
+                            eprintln!("Failed to drop Listener at call limit");
+                        }).ok().unwrap();
+                    }
+                });
             }
         }
     }
 
-    async fn emit_async<T: Send + Sync>(&self, event_name: &str, payload: EventPayload<T>) {
-        let clone = self.clone();
+    async fn emit_async(&mut self, event_name: &str, payload: EventPayload<T>) {
+        let _event_name = event_name.to_string();
+        let mut self_clone = self.clone();
+
         tokio::spawn(async move {
-            clone.emit(event_name, payload);
+            self_clone.emit(&_event_name, payload);
         });
     }
 
