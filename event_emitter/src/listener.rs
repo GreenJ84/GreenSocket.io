@@ -14,8 +14,8 @@ impl<T> Listener<T> {
     }
     pub fn call(&self, payload: &EventPayload<T>) {
        (self.callback)(payload);
-        if let Some(mut lifetime) = self.lifetime{
-            lifetime -= 1;
+        if let Some(mut _lifetime) = self.lifetime{
+            _lifetime -= 1;
         }
     }
     pub fn at_limit(&self) -> bool {

@@ -33,7 +33,7 @@ pub trait EventHandler<T: Send + Sync>: Send + Sync {
     /// Ensure finality/success of all event callbacks before deleting the event
     fn emit_final(&mut self, event_name: &str, payload: EventPayload<T>) -> Result<(), EventError>;
     /// Fire and forget all event callbacks
-    fn emit_async(&mut self, event_name: &str, payload: EventPayload<T>) -> Box<dyn Future<Output=()> + Send>;
+    fn emit_async<'a>(&'a mut self, event_name: &'a str, payload: EventPayload<T>) -> Box<dyn Future<Output=()> + Send + 'a>;
     /// Fire and forget all event callbacks before deleting the event
-    fn emit_final_async(&mut self, event_name: &str, payload: EventPayload<T>) -> Box<dyn Future<Output=()> + Send>;
+    fn emit_final_async<'a>(&'a mut self, event_name: &'a str, payload: EventPayload<T>) -> Box<dyn Future<Output=()> + Send + 'a>;
 }

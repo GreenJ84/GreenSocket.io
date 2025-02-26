@@ -1,18 +1,19 @@
+use std::future::Future;
 use std::sync::Arc;
 use dashmap::DashMap;
 use crate::event_handler::EventHandler;
-use crate::{EventError, EventPayload};
+use crate::{Callback, EventError, EventPayload};
 use crate::listener::Listener;
 
 pub type EventManager<T> = Arc<EventEmitter<T>>;
 
 /// A struct intended to handle the implementations of reacting to Events
 #[derive(Default, Clone)]
-struct EventEmitter<T> where T: Send + Sync + Clone  {
+pub struct EventEmitter<T> where T: Send + Sync  {
     max_listeners: usize,
     listeners: Arc<DashMap<String, Vec<Listener<T>>>>,
 }
-impl<T: Send + Sync + Clone> EventEmitter<T>{
+impl<T: Send + Sync + Clone+ 'static> EventEmitter<T>{
     pub fn new() -> Self {
         Self {
             max_listeners: 10usize,
@@ -20,42 +21,48 @@ impl<T: Send + Sync + Clone> EventEmitter<T>{
         }
     }
 }
-impl<T: Send+ Sync + Clone + 'static> EventHandler<T> for EventEmitter<T> {
+impl<T: Send + Sync + Clone + 'static> EventEmitter<T> {
+    fn listeners_mut(&mut self) -> &Arc<DashMap<String, Vec<Listener<T>>>> {
+        &self.listeners
+    }
+}
+impl<T: Send+ Sync + Clone+ 'static> EventHandler<T> for EventEmitter<T> {
     fn event_names(&self) -> Vec<String> {
         self.listeners.iter().map(|entry| entry.key().clone()).collect()
     }
+    fn set_max_listeners(&mut self, max: usize) { self.max_listeners = max; }
+    fn max_listeners(&self) -> usize { self.max_listeners }
 
-    fn add_listener(&mut self, event_name: &str, callback: Listener<T>) -> Result<(), EventError> {
+
+    fn add_listener(&mut self, event_name: &str, callback: Callback<T>) -> Result<(), EventError> {
+        self.add_limited_listener(event_name, callback, 0)
+    }
+
+    fn add_limited_listener(&mut self, event_name: &str, callback: Callback<T>, limit: u64) -> Result<(), EventError> {
         let mut entry = self.listeners.entry(event_name.to_string()).or_default();
         if entry.len() < self.max_listeners {
-            entry.push(callback);
-            Ok(())
-        } else {
-            Err(EventError::OverloadedEvent)
+            let listener = Listener::new(
+                callback,
+                if limit > 0 { Some(limit) } else { None }
+            );
+            entry.push(listener);
+            return Ok(());
         }
+        Err(EventError::OverloadedEvent)
     }
 
-    fn on(&mut self, event_name: &str, callback: Listener<T>) -> Result<(), EventError> {
-        self.add_listener(event_name, callback)
+    fn add_once(&mut self, event_name: &str, callback: Callback<T>) -> Result<(), EventError> {
+        self.add_limited_listener(event_name, callback, 1)
     }
 
-    fn add_limited_listener(&mut self, event_name: &str, callback: Listener<T>) -> Result<(), EventError> {
-        todo!()
+
+    fn listener_count(&self, event_name: &str) -> usize {
+        self.listeners
+            .get(event_name)
+            .map(|entry| entry.len())
+            .unwrap_or(0)
     }
 
-    fn on_limited(&mut self, event_name: &str, callback: Listener<T>, limit: u64) -> Result<(), EventError> {
-        todo!()
-    }
-
-    fn once(&mut self, event_name: &str, callback: Listener<T>) -> Result<(), EventError> {
-        let mut entry = self.listeners.entry(event_name.to_string()).or_default();
-        if entry.len() < self.max_listeners {
-            entry.push(callback);
-            Ok(())
-        } else {
-            Err(EventError::OverloadedEvent)
-        }
-    }
 
     fn remove_listener(&mut self, event_name: &str, callback: &Listener<T>) -> Result<(), EventError> {
         if let Some(mut entry) = self.listeners.get_mut(event_name) {
@@ -71,10 +78,6 @@ impl<T: Send+ Sync + Clone + 'static> EventHandler<T> for EventEmitter<T> {
         Err(EventError::EventNotFound)
     }
 
-    fn off(&mut self, event_name: &str, callback: &Listener<T>) -> Result<(), EventError> {
-        self.remove_listener(event_name, callback)
-    }
-
     fn remove_all_listeners(&mut self, event_name: &str) -> Result<(), EventError> {
         if self.listeners.remove(event_name).is_some() {
             Ok(())
@@ -83,46 +86,65 @@ impl<T: Send+ Sync + Clone + 'static> EventHandler<T> for EventEmitter<T> {
         }
     }
 
-    fn emit(&mut self, event_name: &str, payload: EventPayload<T>) {
-        if let Some(entry) = self.listeners.get(event_name) {
-            for listener in entry.iter() {
-                let mut _self = self.clone();
-                let payload = payload.clone();
-                let listener = listener.clone();
-                let event_name = event_name.to_string();
-                tokio::spawn(async move {
-                    listener.call(payload);
-                    if listener.at_limit() {
-                        _self.remove_listener(&event_name, &listener).map_err(|_|{
-                            eprintln!("Failed to drop Listener at call limit");
-                        }).ok().unwrap();
-                    }
-                });
+
+    fn emit(&mut self, event_name: &str, payload: EventPayload<T>) -> Result<(), EventError> {
+        if let Some(mut entry) = self.listeners_mut().get_mut(event_name) {
+            for idx in (0..entry.len()).rev() {
+                let listener = entry.get(idx).unwrap();
+                listener.call(&payload);
+                if listener.at_limit(){
+                    entry.remove(idx);
+                }
             }
+            return Ok(());
         }
+        Err(EventError::EventNotFound)
     }
 
-    async fn emit_async(&mut self, event_name: &str, payload: EventPayload<T>) {
-        let _event_name = event_name.to_string();
-        let mut self_clone = self.clone();
-
-        tokio::spawn(async move {
-            self_clone.emit(&_event_name, payload);
-        });
+    fn emit_final(&mut self, event_name: &str, payload: EventPayload<T>) -> Result<(), EventError> {
+        if self.listeners_mut().contains_key(event_name){
+            for listener in self.listeners.get(event_name).unwrap().iter() {
+                listener.call(&payload);
+            }
+            self.listeners_mut().remove(event_name);
+            return Ok(())
+        }
+        Err(EventError::EventNotFound)
     }
 
-    fn set_max_listeners(&mut self, max: usize) {
-        self.max_listeners = max;
+    fn emit_async<'a>(&'a mut self, event_name: &'a str, payload: EventPayload<T>) -> Box<dyn Future<Output=()> + Send + 'a> {
+        Box::new(async move {
+            if let Some(entry) = self.listeners.get(event_name) {
+                for listener in entry.iter() {
+                    let mut _self = self.clone();
+                    let listener = listener.clone();
+                    let payload = Arc::clone(&payload);
+                    let event_name = event_name.to_string();
+                    tokio::spawn(async move {
+                        listener.call(&payload);
+                        if listener.at_limit() {
+                            if let Err(err) =  _self.remove_listener(&event_name, &listener){
+                                eprintln!("Error removing listener: {:?}", err);
+                            }
+                        }
+                    });
+                }
+            }
+        })
     }
 
-    fn max_listeners(&self) -> usize {
-        self.max_listeners
-    }
-
-    fn listener_count(&self, event_name: &str) -> Result<usize, EventError> {
-        self.listeners
-            .get(event_name)
-            .map(|entry| entry.len())
-            .ok_or(EventError::EventNotFound)
+    fn emit_final_async<'a>(&'a mut self, event_name: &'a str, payload: EventPayload<T>) -> Box<dyn Future<Output=()> + Send + 'a> {
+        Box::new(async move {
+            if let Some(entry) = self.listeners.get(event_name) {
+                for listener in entry.iter() {
+                    let listener = listener.clone();
+                    let payload = Arc::clone(&payload);
+                    tokio::spawn(async move {
+                        listener.call(&payload);
+                    });
+                }
+                self.listeners.remove(event_name);
+            }
+        })
     }
 }
