@@ -9,11 +9,11 @@ pub trait EventHandler<T: Send + Sync>: Send + Sync {
     fn max_listeners(&self) -> usize;
 
     /// Add an infinite Listener
-    fn add_listener(&mut self, event_name: &str, callback: Callback<T>) -> Result<(), EventError>;
+    fn add_listener(&mut self, event_name: &str, callback: Callback<T>) -> Result<Listener<T>, EventError>;
     /// Add a finite Listener
-    fn add_limited_listener(&mut self, event_name: &str, callback: Callback<T>, limit: u64) -> Result<(), EventError>;
+    fn add_limited_listener(&mut self, event_name: &str, callback: Callback<T>, limit: u64) -> Result<Listener<T>, EventError>;
     /// Add a single instance Listener
-    fn add_once(&mut self, event_name: &str, callback: Callback<T>) -> Result<(), EventError>;
+    fn add_once(&mut self, event_name: &str, callback: Callback<T>) -> Result<Listener<T>, EventError>;
 
     /// Check the number of listeners that are registered to a certain event<br/>
     /// Throws an error for event names that have no active listeners (are not currently registered)
