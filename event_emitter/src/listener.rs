@@ -1,3 +1,4 @@
+use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
 
 use crate::{Callback, EventPayload};
@@ -26,6 +27,11 @@ impl<T> Listener<T> {
     }
 }
 
+impl<T> Debug for Listener<T> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Listener (limit: {:?})", self.lifetime)
+    }
+}
 impl<T> PartialEq<Self> for Listener<T> {
     fn eq(&self, other: &Self) -> bool {
         Arc::ptr_eq(&self.callback, &other.callback)
