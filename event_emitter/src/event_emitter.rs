@@ -8,15 +8,23 @@ use crate::listener::Listener;
 pub type EventManager<T> = Arc<EventEmitter<T>>;
 
 /// A struct intended to handle the implementations of reacting to Events
-#[derive(Default, Clone)]
-pub struct EventEmitter<T> where T: Send + Sync  {
+#[derive(Clone)]
+pub struct EventEmitter<T> where T: Send + Sync + Clone + 'static  {
     max_listeners: usize,
     listeners: Arc<DashMap<String, Vec<Listener<T>>>>,
 }
 impl<T: Send + Sync + Clone+ 'static> EventEmitter<T>{
-    pub fn new() -> Self {
+    pub fn new(max_listeners: usize) -> Self {
         Self {
-            max_listeners: 10usize,
+            max_listeners,
+            listeners: Arc::new(DashMap::new()),
+        }
+    }
+}
+impl<T: Send + Sync + Clone + 'static> Default for EventEmitter<T>{
+    fn default() -> Self {
+        Self {
+            max_listeners: 10,
             listeners: Arc::new(DashMap::new()),
         }
     }
@@ -34,24 +42,24 @@ impl<T: Send+ Sync + Clone+ 'static> EventHandler<T> for EventEmitter<T> {
     fn max_listeners(&self) -> usize { self.max_listeners }
 
 
-    fn add_listener(&mut self, event_name: &str, callback: Callback<T>) -> Result<(), EventError> {
+    fn add_listener(&mut self, event_name: &str, callback: Callback<T>) -> Result<Listener<T>, EventError> {
         self.add_limited_listener(event_name, callback, 0)
     }
 
-    fn add_limited_listener(&mut self, event_name: &str, callback: Callback<T>, limit: u64) -> Result<(), EventError> {
+    fn add_limited_listener(&mut self, event_name: &str, callback: Callback<T>, limit: u64) -> Result<Listener<T>, EventError> {
         let mut entry = self.listeners.entry(event_name.to_string()).or_default();
         if entry.len() < self.max_listeners {
             let listener = Listener::new(
                 callback,
                 if limit > 0 { Some(limit) } else { None }
             );
-            entry.push(listener);
-            return Ok(());
+            entry.push(listener.clone());
+            return Ok(listener);
         }
         Err(EventError::OverloadedEvent)
     }
 
-    fn add_once(&mut self, event_name: &str, callback: Callback<T>) -> Result<(), EventError> {
+    fn add_once(&mut self, event_name: &str, callback: Callback<T>) -> Result<Listener<T>, EventError> {
         self.add_limited_listener(event_name, callback, 1)
     }
 
