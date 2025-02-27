@@ -1,12 +1,18 @@
 use std::sync::Arc;
 
 mod event_handler;
-mod event_manager;
+mod event_emitter;
 mod listener;
+
+#[cfg(test)]
+mod tests;
 
 pub use listener::Listener;
 pub use event_handler::EventHandler;
-pub use event_manager::EventManager;
+pub use event_emitter::{
+    EventManager,
+    EventEmitter
+};
 
 /// Type alias for anything that is cross-thread safe and send-able
 pub type EventPayload<T> = Arc<T>;
@@ -25,3 +31,17 @@ pub enum EventError {
     /// Any other possible Errors during Event Handling
     Other(Box<dyn std::error::Error + Send + Sync>),
 }
+impl PartialEq for EventError {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (EventError::ListenerNotFound, EventError::ListenerNotFound) |
+            (EventError::EventNotFound, EventError::EventNotFound) |
+            (EventError::OverloadedEvent, EventError::OverloadedEvent) => {
+                true
+            },
+            (EventError::Other(a), EventError::Other(b)) => a.to_string() == b.to_string(),
+            _=> false
+        }
+    }
+}
+impl Eq for EventError {}
