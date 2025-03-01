@@ -439,3 +439,36 @@ mod emitting_final_events{
         }
     }
 }
+
+
+mod emitting_async_final_events {
+    use super::*;
+
+    #[tokio::test]
+    async fn emit_final_async_drops_infinite_listener() {
+        let mut emitter = EventManager::new(EventEmitter::default());
+        {
+            let emitter = Arc::get_mut(&mut emitter).unwrap();
+            assert!(emitter.add_listener("final_async_event", Arc::new(|_| {})).is_ok());
+
+            assert!(
+                emitter.emit_final_async("final_async_event", test_string_payload(""), false).is_ok()
+            );
+        }
+        assert!(!emitter.has_listener("final_async_event"), "Final async emit did not remove listeners");
+    }
+
+    #[tokio::test]
+    async fn emit_final_async_drops_limited_listener() {
+        let mut emitter = EventManager::new(EventEmitter::default());
+        {
+            let emitter = Arc::get_mut(&mut emitter).unwrap();
+            assert!(emitter.add_limited_listener("final_async_event", Arc::new(|_| {}), 5).is_ok());
+
+            assert!(
+                emitter.emit_final_async("final_async_event", test_string_payload(""), false).is_ok()
+            );
+        }
+        assert!(!emitter.has_listener("final_async_event"), "Final async emit did not remove limited listeners");
+    }
+}
