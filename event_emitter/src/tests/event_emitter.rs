@@ -92,3 +92,80 @@ mod adding_listeners {
         }
     }
 }
+
+
+mod removing_listeners {
+    use crate::Listener;
+    use super::*;
+
+    #[test]
+    fn remove_single_listener() {
+        let mut emitter = EventManager::new(EventEmitter::<TestStringPayload>::default());
+        if let Some(emitter) = Arc::get_mut(&mut emitter) {
+            let listener = emitter.add_listener("test", Arc::new(|_| {}));
+            assert!(listener.is_ok());
+            assert_eq!(emitter.listener_count("test"), 1);
+
+            assert!(emitter.remove_listener("test", &listener.unwrap()).is_ok());
+            assert_eq!(emitter.listener_count("test"), 0);
+        }
+    }
+
+    #[test]
+    fn remove_single_finite_listener() {
+        let mut emitter = EventManager::new(EventEmitter::<TestStringPayload>::default());
+        if let Some(emitter) = Arc::get_mut(&mut emitter) {
+            let listener = emitter.add_limited_listener("test", Arc::new(|_| {}), 5);
+            assert!(listener.is_ok());
+            assert_eq!(emitter.listener_count("test"), 1);
+
+            assert!(emitter.remove_listener("test", &listener.unwrap()).is_ok());
+            assert_eq!(emitter.listener_count("test"), 0);
+        }
+    }
+
+    #[test]
+    fn remove_single_once_listener() {
+        let mut emitter = EventManager::new(EventEmitter::<TestStringPayload>::default());
+        if let Some(emitter) = Arc::get_mut(&mut emitter) {
+            let listener = emitter.add_once("test", Arc::new(|_| {}));
+            assert!(listener.is_ok());
+            assert_eq!(emitter.listener_count("test"), 1);
+
+            assert!(emitter.remove_listener("test", &listener.unwrap()).is_ok());
+            assert_eq!(emitter.listener_count("test"), 0);
+        }
+    }
+
+    #[test]
+    fn remove_all_listeners() {
+        let mut emitter = EventManager::new(EventEmitter::<TestStringPayload>::default());
+        if let Some(emitter) = Arc::get_mut(&mut emitter) {
+            for _ in 0..10 {
+                emitter.add_listener("test", Arc::new(|_| {})).unwrap();
+            }
+            assert_eq!(emitter.listener_count("test"), 10);
+
+            assert!(emitter.remove_all_listeners("test").is_ok());
+            assert_eq!(emitter.listener_count("test"), 0);
+        }
+    }
+
+    #[test]
+    fn remove_invalid_listener_throws_error() {
+        let mut emitter = EventManager::new(EventEmitter::<TestStringPayload>::default());
+        if let Some(emitter) = Arc::get_mut(&mut emitter) {
+            emitter.add_listener("test", Arc::new(|_| {})).unwrap();
+            assert_eq!(emitter.remove_listener("test", &Listener::<TestStringPayload>::new(Arc::new(|_| {}), None)), Err(EventError::ListenerNotFound));
+        }
+    }
+
+    #[test]
+    fn remove_from_invalid_event_throws_error() {
+        let mut emitter = EventManager::new(EventEmitter::<TestStringPayload>::default());
+        if let Some(emitter) = Arc::get_mut(&mut emitter) {
+            emitter.add_listener("test", Arc::new(|_| {})).unwrap();
+            assert_eq!(emitter.remove_listener("not_test",  &Listener::<TestStringPayload>::new(Arc::new(|_| {}), None)), Err(EventError::EventNotFound));
+        }
+    }
+}
