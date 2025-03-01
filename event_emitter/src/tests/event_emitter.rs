@@ -387,3 +387,55 @@ mod emitting_async_events {
     // }
 }
 
+
+mod emitting_final_events{
+    use super::*;
+
+    #[test]
+    fn emit_final_drops_infinite_listener() {
+        let mut emitter = EventManager::<TestStringPayload>::new(EventEmitter::default());
+        {
+            let emitter = Arc::get_mut(&mut emitter).unwrap();
+            assert!(
+                emitter.add_listener("count_final", Arc::new(move |payload| {
+                    assert_eq!(payload.as_ref(), "Test");
+                })).is_ok(),
+                "Failed to add event listener"
+            );
+
+            assert!(
+                emitter.emit_final("count_final", test_string_payload("Test")).is_ok(),
+                "Failed to emit final event"
+            );
+            assert!(
+                emitter.emit_final("count_final", test_string_payload("Test"))
+                    .is_err_and(|e| e.eq(&EventError::EventNotFound)),
+                "Failed to emit final event"
+            );
+        }
+
+    }
+
+    #[test]
+    fn emit_final_drops_limited_listener() {
+        let mut emitter = EventManager::<TestStringPayload>::new(EventEmitter::default());
+        {
+            let emitter = Arc::get_mut(&mut emitter).unwrap();
+            assert!(
+                emitter.add_limited_listener("count_final", Arc::new(move |_| {}), 5).is_ok(),
+                "Failed to add event listener"
+            );
+
+            assert!(
+                emitter.emit_final("count_final", test_string_payload("Test")).is_ok(),
+                "Failed to emit final event"
+            );
+
+            assert!(
+                emitter.emit_final("count_final", test_string_payload("Test"))
+                    .is_err_and(|e| e.eq(&EventError::EventNotFound)),
+                "Failed to emit final event"
+            );
+        }
+    }
+}
