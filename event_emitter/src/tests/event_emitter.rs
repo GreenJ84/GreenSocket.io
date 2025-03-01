@@ -261,3 +261,129 @@ mod emitting_events {
     }
 }
 
+
+mod emitting_async_events {
+    use super::*;
+
+    #[tokio::test]
+    async fn async_emission_successful() {
+        let mut emitter = EventManager::<TestStringPayload>::new(EventEmitter::default());
+        let count = Arc::new(Mutex::new(0));
+        let count_clone = Arc::clone(&count);
+        {
+            let emitter = Arc::get_mut(&mut emitter).unwrap();
+            assert!(
+                emitter.add_listener("async_event", Arc::new(move |payload| {
+                    assert_eq!(payload.as_ref(), "Async Test");
+                    *count_clone.lock().unwrap() += 1;
+                })).is_ok(),
+                "Failed to add event listener"
+            );
+
+            for _ in 0..10 {
+                assert!(
+                    emitter.emit_async("async_event", test_string_payload("Async Test"), false).is_ok()
+                );
+                sleep(Duration::from_millis(100)).await;
+            }
+        }
+
+        assert_eq!(*count.lock().unwrap(), 10, "Async event callbacks unsuccessful");
+    }
+
+    #[tokio::test]
+    async fn async_limited_listener_emission_drop_off_successful() {
+        let mut emitter = EventManager::new(EventEmitter::default());
+        let count = Arc::new(Mutex::new(0));
+        let count_clone = Arc::clone(&count);
+        {
+            let emitter = Arc::get_mut(&mut emitter).unwrap();
+            assert!(
+                emitter.add_limited_listener(
+                    "async_event",
+                    Arc::new(move |_| {
+                        *count_clone.lock().unwrap() += 1;
+                    }),
+                    5
+                ).is_ok(),
+                "Failed to add event listener"
+            );
+
+            for _ in 0..5{
+                assert!(
+                    emitter.emit_async("async_event", test_string_payload(""), false).is_ok()
+                );
+                sleep(Duration::from_millis(100)).await; // Multiple emit rely on same Mutex for test
+            }
+        }
+
+        assert_eq!(*count.lock().unwrap(), 5, "Event callbacks unsuccessful");
+        assert!(!emitter.has_listener("count"), "Failed to remove limited listener");
+    }
+
+    #[tokio::test]
+    async fn async_once_listener_emission_drop_off_successful() {
+        let mut emitter = EventManager::new(EventEmitter::default());
+        let count = Arc::new(Mutex::new(0));
+        let count_clone = Arc::clone(&count);
+        {
+            let emitter = Arc::get_mut(&mut emitter).unwrap();
+            assert!(
+                emitter.add_once(
+                    "final_async_event",
+                    Arc::new(move |_| {
+                        *count_clone.lock().unwrap() += 1;
+                    })).is_ok(),
+                "Failed to add event listener"
+            );
+
+            assert!(
+                emitter.emit_async("final_async_event", test_string_payload(""), false).is_ok()
+            );
+            sleep(Duration::from_millis(100)).await;
+        }
+
+        assert_eq!(*count.lock().unwrap(), 1, "Event callbacks unsuccessful");
+        assert!(!emitter.has_listener("count"), "Failed to remove once listener");
+    }
+
+    // async fn off(){
+    //     let mut emitter = EventManager::<TestStringPayload>::new(EventEmitter::default());
+    //     {
+    //         let emitter = Arc::get_mut(&mut emitter).unwrap();
+    //         let callback_count = Arc::new(Mutex::new(0));
+    //         let callback_count_clone = Arc::clone(&callback_count);
+    //
+    //         let (tx, mut rx) = tokio::sync::mpsc::channel(10);
+    //         let tx = Arc::new(Mutex::new(Some(tx)));
+    //
+    //         assert!(emitter.add_listener("async_event", Arc::new({
+    //             let tx = Arc::clone(&tx);
+    //             move |val| {
+    //                 if let Some(tx) = tx.lock().unwrap().as_ref() {
+    //                     let _ = tx.clone().send(val.clone());
+    //                     *callback_count_clone.lock().unwrap() += 1;
+    //                 }
+    //             }
+    //         })).is_ok());
+    //
+    //         for _ in 0..10 {
+    //             emitter.emit_async("async_event", Arc::new("Hello".to_string())).await;
+    //         }
+    //         drop(tx);
+    //
+    //         sleep(Duration::from_secs(5)).await;
+    //         assert_eq!(*callback_count.lock().unwrap(), 10, "Event callbacks not triggered");
+    //
+    //         let mut received = 0;
+    //         while let Some(val) = rx.recv().await{
+    //            println!("{:?}", val);
+    //             received+=1;
+    //             if received > 0 {
+    //                 break;
+    //             }
+    //         }
+    //     }
+    // }
+}
+
