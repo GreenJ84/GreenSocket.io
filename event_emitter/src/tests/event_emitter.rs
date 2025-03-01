@@ -169,3 +169,95 @@ mod removing_listeners {
         }
     }
 }
+
+
+mod emitting_events {
+    use super::*;
+
+    #[test]
+    fn emit_successful() {
+        let mut emitter = EventManager::<TestStringPayload>::new(EventEmitter::default());
+        let count = Arc::new(Mutex::new(0));
+        let count_clone = Arc::clone(&count);
+        {
+            let emitter = Arc::get_mut(&mut emitter).unwrap();
+            assert!(
+                emitter.add_listener("count", Arc::new(move |payload| {
+                    assert_eq!(payload.as_ref(), "Test");
+                    *count_clone.lock().unwrap() += 1;
+                })).is_ok(),
+                "Failed to add event listener"
+            );
+
+            for _ in 0..10 {
+                assert!(
+                    emitter.emit("count", test_string_payload("Test")).is_ok(),
+                    "Failed to emit event"
+                );
+            }
+        }
+
+        assert_eq!(*count.lock().unwrap(), 10, "Event callbacks unsuccessful");
+    }
+
+    #[test]
+    fn limited_listener_emission_drop_off_successful() {
+        let mut emitter = EventManager::new(EventEmitter::default());
+        let count = Arc::new(Mutex::new(0));
+        let count_clone = Arc::clone(&count);
+        {
+            let emitter = Arc::get_mut(&mut emitter).unwrap();
+            assert!(
+                emitter.add_limited_listener(
+                    "count",
+                    Arc::new(move |_| {
+                        *count_clone.lock().unwrap() += 1;
+                    }),
+                    5
+                ).is_ok(),
+                "Failed to add event listener"
+            );
+
+            for _ in 0..5 {
+                assert!(
+                    emitter.emit("count", test_string_payload("Test")).is_ok(),
+                    "Failed to emit event to limited listeners"
+                );
+            }
+        }
+
+        assert!(
+            !emitter.has_listener("count"),
+            "Failed to remove limited listener {}", emitter.listener_count("count")
+        );
+        assert_eq!(*count.lock().unwrap(), 5, "Event callbacks unsuccessful");
+    }
+
+    #[test]
+    fn once_listener_emission_drop_off_successful() {
+        let mut emitter = EventManager::new(EventEmitter::default());
+        let count = Arc::new(Mutex::new(0));
+        let count_clone = Arc::clone(&count);
+        {
+            let emitter = Arc::get_mut(&mut emitter).unwrap();
+            assert!(
+                emitter.add_once("count", Arc::new(move |_| {
+                    *count_clone.lock().unwrap() += 1;
+                })).is_ok(),
+                "Failed to add once event listener"
+            );
+
+            assert!(
+                emitter.emit("count", test_string_payload("Increment")).is_ok(),
+                "Failed to emit event to once listeners"
+            );
+        }
+
+        assert!(
+            !emitter.has_listener("count"),
+            "Failed to remove once listener: {}", emitter.listener_count("count")
+        );
+        assert_eq!(*count.lock().unwrap(), 1, "Event callbacks unsuccessful");
+    }
+}
+
