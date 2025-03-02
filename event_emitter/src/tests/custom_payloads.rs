@@ -120,3 +120,64 @@ mod primitive_data_payloads {
         }
     }
 }
+
+mod binary_payload {
+    use super::*;
+
+    type TestBinaryPayload = Vec<u8>;
+    fn test_binary_payload(data: &str) -> EventPayload<TestBinaryPayload> {
+        Arc::new(Vec::from(data.as_bytes()))
+    }
+
+    #[test]
+    fn binary_emit_successful() {
+        let mut emitter = EventManager::<TestBinaryPayload>::new(EventEmitter::default());
+        let count = Arc::new(Mutex::new(0));
+        let count_clone = Arc::clone(&count);
+        {
+            let emitter = Arc::get_mut(&mut emitter).unwrap();
+            assert!(
+                emitter.add_listener("count", Arc::new(move |payload| {
+                    assert_eq!(payload.as_ref(), "Test".as_bytes());
+                    *count_clone.lock().unwrap() += 1;
+                })).is_ok(),
+                "Failed to add event listener"
+            );
+
+            for _ in 0..10 {
+                assert!(
+                    emitter.emit("count", test_binary_payload("Test")).is_ok(),
+                    "Failed to emit event"
+                );
+            }
+        }
+
+        assert_eq!(*count.lock().unwrap(), 10, "Event callbacks unsuccessful");
+    }
+
+    #[tokio::test]
+    async fn binary_async_emission_successful() {
+        let mut emitter = EventManager::<TestBinaryPayload>::new(EventEmitter::default());
+        let count = Arc::new(Mutex::new(0));
+        let count_clone = Arc::clone(&count);
+        {
+            let emitter = Arc::get_mut(&mut emitter).unwrap();
+            assert!(
+                emitter.add_listener("async_event", Arc::new(move |payload| {
+                    assert_eq!(payload.as_ref(), "Async Test".as_bytes());
+                    *count_clone.lock().unwrap() += 1;
+                })).is_ok(),
+                "Failed to add event listener"
+            );
+
+            for _ in 0..10 {
+                assert!(
+                    emitter.emit_async("async_event", test_binary_payload("Async Test"), false).is_ok()
+                );
+                sleep(Duration::from_millis(100)).await;
+            }
+        }
+
+        assert_eq!(*count.lock().unwrap(), 10, "Async event callbacks unsuccessful");
+    }
+}
