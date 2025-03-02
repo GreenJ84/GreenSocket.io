@@ -9,11 +9,11 @@ pub type EventManager<T> = Arc<EventEmitter<T>>;
 
 /// A struct intended to handle the implementations of reacting to Events
 #[derive(Clone)]
-pub struct EventEmitter<T> where T: Send + Sync + Clone + 'static  {
+pub struct EventEmitter<T> where T: Send + Sync + 'static  {
     max_listeners: usize,
     listeners: Arc<DashMap<String, Vec<Listener<T>>>>,
 }
-impl<T: Send + Sync + Clone+ 'static> EventEmitter<T>{
+impl<T: Send + Sync+ 'static> EventEmitter<T>{
     pub fn new(max_listeners: usize) -> Self {
         Self {
             max_listeners,
@@ -21,7 +21,7 @@ impl<T: Send + Sync + Clone+ 'static> EventEmitter<T>{
         }
     }
 }
-impl<T: Send + Sync + Clone + 'static> Default for EventEmitter<T>{
+impl<T: Send + Sync> Default for EventEmitter<T>{
     fn default() -> Self {
         Self {
             max_listeners: 10,
@@ -29,12 +29,12 @@ impl<T: Send + Sync + Clone + 'static> Default for EventEmitter<T>{
         }
     }
 }
-impl<T: Send + Sync + Clone + 'static> EventEmitter<T> {
+impl<T: Send + Sync> EventEmitter<T> {
     fn listeners_mut(&mut self) -> &Arc<DashMap<String, Vec<Listener<T>>>> {
         &self.listeners
     }
 }
-impl<T: Send+ Sync + Clone+ 'static> EventHandler<T> for EventEmitter<T> {
+impl<T: Send+ Sync> EventHandler<T> for EventEmitter<T> {
     fn event_names(&self) -> Vec<String> {
         self.listeners.iter().map(|entry| entry.key().clone()).collect()
     }
