@@ -24,8 +24,43 @@ impl<T: Send + Sync + 'static> Listener<T> {
         }
         (self.callback)(payload);
     }
+
+    /// Best for Background Processing and I/O heavy tasks
+    pub fn background_call(&mut self, payload: &EventPayload<T>) {
+        if let Some(ref lifetime) = self.lifetime {
+            let mut count = lifetime.lock().unwrap();
+            *count -= 1;
+        }
+
+        tokio::spawn({
+            let callback = Arc::clone(&self.callback);
+            let payload = Arc::clone(&payload);
+            async move {
+                callback(&payload);
+            }
+        });
+    }
+
+    /// Best for CPU heavy Operations
+    pub fn blocking_call(&mut self, payload: &EventPayload<T>) {
+        if let Some(ref lifetime) = self.lifetime {
+            let mut count = lifetime.lock().unwrap();
+            *count -= 1;
+        }
+
+        tokio::task::spawn_blocking({
+            let callback = Arc::clone(&self.callback);
+            let payload = Arc::clone(&payload);
+            move || { callback(&payload) }
+        });
+    }
+
     pub fn at_limit(&self) -> bool {
-        self.lifetime == Some(0)
+        if let Some(ref lifetime) = self.lifetime {
+            let count = lifetime.lock().unwrap();
+            return *count == 0;
+        }
+        false
     }
     pub fn eq_callback(&self, callback: Callback<T>) -> bool{
         Arc::ptr_eq(&self.callback, &callback)
