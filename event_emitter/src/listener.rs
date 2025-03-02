@@ -8,15 +8,21 @@ pub struct Listener<T> {
     callback: Callback<T>,
     lifetime: Option<Arc<Mutex<u64>>>,
 }
-impl<T> Listener<T> {
+impl<T: Send + Sync + 'static> Listener<T> {
     pub fn new(callback: Callback<T>, lifetime: Option<u64>) -> Self {
-        Self { callback, lifetime }
-    }
-    pub fn call(&self, payload: &EventPayload<T>) {
-       (self.callback)(payload);
-        if let Some(mut _lifetime) = self.lifetime{
-            _lifetime -= 1;
+        if let Some(limit) = lifetime {
+            return Self { callback, lifetime: Some(Arc::new(Mutex::new(limit))) };
         }
+        Self { callback, lifetime: None }
+    }
+
+    /// Best for Synchronous order dependant tasks
+    pub fn call(&mut self, payload: &EventPayload<T>) {
+        if let Some(ref lifetime) = self.lifetime {
+            let mut count = lifetime.lock().unwrap();
+            *count -= 1;
+        }
+        (self.callback)(payload);
     }
     pub fn at_limit(&self) -> bool {
         self.lifetime == Some(0)
