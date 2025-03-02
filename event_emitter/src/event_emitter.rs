@@ -1,6 +1,6 @@
-use std::future::Future;
 use std::sync::Arc;
 use dashmap::DashMap;
+
 use crate::event_handler::EventHandler;
 use crate::{Callback, EventError, EventPayload};
 use crate::listener::Listener;
@@ -94,16 +94,12 @@ impl<T: Send+ Sync> EventHandler<T> for EventEmitter<T> {
         }
     }
 
-
     fn emit(&mut self, event_name: &str, payload: EventPayload<T>) -> Result<(), EventError> {
         if let Some(mut entry) = self.listeners_mut().get_mut(event_name) {
-            for idx in (0..entry.len()).rev() {
-                let listener = entry.get(idx).unwrap();
+            for listener in entry.iter_mut().rev() {
                 listener.call(&payload);
-                if listener.at_limit(){
-                    entry.remove(idx);
-                }
             }
+            entry.retain(|listener| !listener.at_limit());
             return Ok(());
         }
         Err(EventError::EventNotFound)
@@ -111,7 +107,7 @@ impl<T: Send+ Sync> EventHandler<T> for EventEmitter<T> {
 
     fn emit_final(&mut self, event_name: &str, payload: EventPayload<T>) -> Result<(), EventError> {
         if self.listeners_mut().contains_key(event_name){
-            for listener in self.listeners.get(event_name).unwrap().iter() {
+            for listener in self.listeners.get_mut(event_name).unwrap().iter_mut() {
                 listener.call(&payload);
             }
             self.listeners_mut().remove(event_name);
@@ -120,39 +116,40 @@ impl<T: Send+ Sync> EventHandler<T> for EventEmitter<T> {
         Err(EventError::EventNotFound)
     }
 
-    fn emit_async<'a>(&'a mut self, event_name: &'a str, payload: EventPayload<T>) -> Box<dyn Future<Output=()> + Send + 'a> {
-        Box::new(async move {
-            if let Some(entry) = self.listeners.get(event_name) {
-                for listener in entry.iter() {
-                    let mut _self = self.clone();
-                    let listener = listener.clone();
-                    let payload = Arc::clone(&payload);
-                    let event_name = event_name.to_string();
-                    tokio::spawn(async move {
-                        listener.call(&payload);
-                        if listener.at_limit() {
-                            if let Err(err) =  _self.remove_listener(&event_name, &listener){
-                                eprintln!("Error removing listener: {:?}", err);
-                            }
-                        }
-                    });
+    /// Concurrent Async: (parallel == false)
+    /// - Tasks do not block each other but share the same CPU core
+    ///
+    /// Parallel Async: (parallel == true)
+    ///  - Tasks run in parallel on different CPU cores
+    fn emit_async<'a>(&'a mut self, event_name: &'a str, payload: EventPayload<T>, parallel: bool) -> Result<(), EventError> {
+        if let Some(mut entry) = self.listeners.get_mut(event_name) {
+            for listener in entry.iter_mut().rev() {
+                if parallel {
+                    listener.background_call(&payload);
+                } else {
+                    listener.blocking_call(&payload);
                 }
             }
-        })
+
+            entry.retain(|listener| !listener.at_limit());
+            return Ok(())
+        }
+        Err(EventError::EventNotFound)
     }
 
-    fn emit_final_async<'a>(&'a mut self, event_name: &'a str, payload: EventPayload<T>) -> Box<dyn Future<Output=()> + Send + 'a> {
-        Box::new(async move {
-            if let Some(entry) = self.listeners.get(event_name) {
-                for listener in entry.iter() {
-                    let listener = listener.clone();
-                    let payload = Arc::clone(&payload);
-                    tokio::spawn(async move {
-                        listener.call(&payload);
-                    });
+    fn emit_final_async<'a>(&'a mut self, event_name: &'a str, payload: EventPayload<T>, parallel: bool) -> Result<(), EventError> {
+        if self.listeners_mut().contains_key(event_name) {
+            for listener in self.listeners_mut().get_mut(event_name).unwrap().iter_mut() {
+                if parallel {
+                    listener.background_call(&payload);
+                } else {
+                    listener.blocking_call(&payload);
                 }
-                self.listeners.remove(event_name);
             }
-        })
+
+            self.listeners_mut().remove(event_name);
+            return Ok(());
+        }
+        Err(EventError::EventNotFound)
     }
 }
