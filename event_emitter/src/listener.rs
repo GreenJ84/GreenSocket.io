@@ -1,13 +1,12 @@
 use std::fmt::{Debug, Formatter};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use crate::{Callback, EventPayload};
 
 /// A Struct that is used to enact upon an emit Event
-#[derive(Clone)]
 pub struct Listener<T> {
     callback: Callback<T>,
-    lifetime: Option<u64>,
+    lifetime: Option<Arc<Mutex<u64>>>,
 }
 impl<T> Listener<T> {
     pub fn new(callback: Callback<T>, lifetime: Option<u64>) -> Self {
@@ -26,7 +25,23 @@ impl<T> Listener<T> {
         Arc::ptr_eq(&self.callback, &callback)
     }
 }
+impl<T> Clone for Listener<T> {
+    fn clone(&self) -> Self {
+        Self {
+            callback: Arc::clone(&self.callback),
+            lifetime: if let Some(limit) = &self.lifetime {
+                Some(Arc::clone(limit))
+            } else { None },
+        }
+    }
 
+    fn clone_from(&mut self, source: &Self) {
+        self.callback = Arc::clone(&source.callback);
+        self.lifetime = if let Some(limit) = &source.lifetime {
+            Some(Arc::clone(limit))
+        } else { None };
+    }
+}
 impl<T> Debug for Listener<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "Listener (limit: {:?})", self.lifetime)
