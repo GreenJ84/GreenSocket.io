@@ -6,6 +6,6 @@ authors.workspace = true
 description.workspace = true
 
 [dependencies]
-tokio = { version = "1.43.0", features = ["macros", "rt-multi-thread"] }
+tokio = { version = "1.43.0", features = ["rt-multi-thread", "sync", "macros", "time"] }
 dashmap = "7.0.0-rc1"
 futures = "0.3.31"
