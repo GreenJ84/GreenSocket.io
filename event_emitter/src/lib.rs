@@ -1,11 +1,18 @@
-use std::sync::Arc;
+//! Rust event emitter
+//!
+//! 'event_emitter' is a collection of utilities that facilitates communication between
+//! different parts of an application, primarily in asynchronous environments. It
+//! operates on the publish-subscribe principle, where an emitter object dispatches
+//! events, and listener functions react to those events. This allows for decoupled
+//! components, enhancing modularity and maintainability.
 
 mod event_handler;
 mod event_emitter;
 mod listener;
-
 #[cfg(test)]
 mod tests;
+
+use std::sync::Arc;
 
 pub use listener::Listener;
 pub use event_handler::EventHandler;
