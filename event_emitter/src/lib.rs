@@ -14,19 +14,47 @@ pub use event_emitter::{
     EventEmitter
 };
 
-/// Type alias for anything that is cross-thread safe and send-able
+/// Type alias for a thread-safe Arc pointer. <br/>
+/// Generic Wrapper for an Event Payload type. <br/>
+/// (*Requires Send + Sync for use in Listener/Event Emitter*)
+///
+/// # Example
+///
+/// ```
+/// use std::sync::Arc;
+/// use event_emitter::{Callback, EventPayload};
+///
+/// let payload: EventPayload<String> = Arc::new(String::from("Emitting value"));
+/// ```
 pub type EventPayload<T> = Arc<T>;
-/// Type alias for any function that is cross-thread safe, send-able and takes a [`EventPayload`](EventPayload) with no return
+
+/// Type alias for a thread-safe Arc pointer that wraps a function. <br/>
+/// Function must take a reference to a [`EventPayload<T>`](EventPayload) with no return.
+///
+/// # Example
+///
+/// ```
+/// use std::sync::Arc;
+/// use event_emitter::{Callback, EventPayload};
+///
+/// let callback: Callback<String> = Arc::new(move |payload: &EventPayload<String>| {
+///     // Use payload reference here
+///     println!("Received event: {}", payload);
+/// });
+/// ```
 pub type Callback<T> = Arc<dyn Fn(&EventPayload<T>) + Send + Sync>;
 
 #[derive(Debug)]
-/// Event Error enum for all customer and unknown error possibilities
+/// Event Error enum for all custom and unknown error possibilities
 pub enum EventError {
-    /// Trying to add more than `max_listeners`to an Event.
+    /// Adding Listener:
+    /// - Trying to add more than `max_listeners`to an Event.
     OverloadedEvent,
-    /// Trying to delete a `Listener` that cannot be found.
+    /// Removing Listener/ Emitting Event:
+    /// - Trying to access a specific `Listener` that cannot be found.
     ListenerNotFound,
-    /// Trying to delete an `Event` that cannot be found.
+    /// Removing Listener/ Emitting Event:
+    /// Trying to access a specific `Event` that cannot be found.
     EventNotFound,
     /// Any other possible Errors during Event Handling
     Other(Box<dyn std::error::Error + Send + Sync>),
