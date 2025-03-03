@@ -17,21 +17,12 @@ pub trait EventHandler<T: Send + Sync>: Send + Sync {
 
 
     /// Add an infinite Listener to a specific event. <br/>
-    /// Returns:
-    /// - a newly added listener, if successful.
-    /// - an error, if this listener addition will exceed maximum listeners.
     fn add_listener(&mut self, event_name: &str, callback: Callback<T>) -> Result<Listener<T>, EventError>;
 
     /// Add a finite Listener to a specific event with the number of emissions it is limited to receive. <br/>
-    /// Returns:
-    /// - a newly added listener, if successful.
-    /// - an error, if this listener addition will exceed maximum listeners.
     fn add_limited_listener(&mut self, event_name: &str, callback: Callback<T>, limit: u64) -> Result<Listener<T>, EventError>;
 
     /// Add a single emission Listener to a specific event. <br/>
-    /// Returns:
-    /// - a newly added listener, if successful.
-    /// - an error, if this listener addition will exceed maximum listeners.
     fn add_once(&mut self, event_name: &str, callback: Callback<T>) -> Result<Listener<T>, EventError>;
 
 
@@ -45,39 +36,22 @@ pub trait EventHandler<T: Send + Sync>: Send + Sync {
     }
 
 
-    /// Remove a specific active listener for an Event. <br/>
-    /// Returns an error for an event name that has no active listeners. <br/>
-    /// Returns an error for not finding a specific listener in a registered event. <br/>
+    /// Remove a specific active listener for an Event.
     fn remove_listener(&mut self, event_name: &str, callback: &Listener<T>) -> Result<(), EventError>;
 
-    /// Remove all Listeners for an Event. <br/>
-    /// Returns an error for an event name that has no active listeners.
+    /// Remove all Listeners for an Event.
     fn remove_all_listeners(&mut self, event_name: &str) -> Result<(), EventError>;
 
 
-    /// Synchronous emission of a specific Event. <br/>
-    /// Returns an error for an event name that has no active listeners.
+    /// Synchronous emission of a specific Event.
     fn emit(&mut self, event_name: &str, payload: EventPayload<T>) -> Result<(), EventError>;
 
-    /// Synchronous emission of a specific Event for the last time. <br/>
-    /// Returns an error for an event name that has no active listeners.
+    /// Synchronous emission of a specific Event for the last time.
     fn emit_final(&mut self, event_name: &str, payload: EventPayload<T>) -> Result<(), EventError>;
 
-    /// Asynchronous emission of a specific Event. <br/>
-    ///
-    /// Accepts a boolean parallel flag: <br/>
-    ///   -- false: Listener callback tasks are run concurrent to other event tasks. <br/>
-    ///   -- true: Listener callback tasks are runs the provided closure on parallel threads dedicated to blocking operations. <br/>
-    ///
-    /// Returns an error for an event name that has no active listeners.
+    /// Asynchronous emission of a specific Event.
     fn emit_async<'a>(&'a mut self, event_name: &'a str, payload: EventPayload<T>, parallel: bool) -> Result<(), EventError>;
 
-    /// Asynchronous emission of a specific Event for the last time. <br/>
-    ///
-    /// Accepts a boolean parallel flag: <br/>
-    ///   -- false: Listener callback tasks are run concurrent to other event tasks. <br/>
-    ///   -- true: Listener callback tasks are runs the provided closure on parallel threads dedicated to blocking operations. <br/>
-    ///
-    /// Returns an error for an event name that has no active listeners.
+    /// Asynchronous emission of a specific Event for the last time.
     fn emit_final_async<'a>(&'a mut self, event_name: &'a str, payload: EventPayload<T>, parallel: bool) -> Result<(), EventError>;
 }
