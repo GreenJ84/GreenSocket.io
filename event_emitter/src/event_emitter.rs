@@ -5,40 +5,110 @@ use crate::event_handler::EventHandler;
 use crate::{Callback, EventError, EventPayload};
 use crate::listener::Listener;
 
+/// Type alias for a cross-thread safe Arc referenced `EventEmitter<T>` struct
 pub type EventManager<T> = Arc<EventEmitter<T>>;
 
-/// A struct intended to handle the implementations of reacting to Events
+/// A struct intended to handle the implementations of the EventHandler trait
+///
+/// This implementation utilizes DashMap, a concurrent associative array/ hashmap as the underlying storage.
 #[derive(Clone)]
 pub struct EventEmitter<T> where T: Send + Sync + 'static  {
     max_listeners: usize,
-    listeners: Arc<DashMap<String, Vec<Listener<T>>>>,
+    events: Arc<DashMap<String, Vec<Listener<T>>>>,
 }
 impl<T: Send + Sync+ 'static> EventEmitter<T>{
+    /// Creates a new `EventEmitter<T>` from a passed max listeners value.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use event_emitter::{EventEmitter, EventHandler};
+    ///
+    /// let emitter: EventEmitter<String> = EventEmitter::new(20);
+    /// assert_eq!(emitter.max_listeners(), 20);
+    /// ```
     pub fn new(max_listeners: usize) -> Self {
         Self {
             max_listeners,
-            listeners: Arc::new(DashMap::new()),
+            events: Arc::new(DashMap::new()),
         }
     }
 }
 impl<T: Send + Sync> Default for EventEmitter<T>{
+    /// Creates a new `EventEmitter<T>` with a default max listeners of 10.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use event_emitter::{EventEmitter, EventHandler};
+    ///
+    /// let emitter: EventEmitter<String> = EventEmitter::default();
+    /// assert_eq!(emitter.max_listeners(), 10);
+    /// ```
     fn default() -> Self {
         Self {
             max_listeners: 10,
-            listeners: Arc::new(DashMap::new()),
+            events: Arc::new(DashMap::new()),
         }
     }
 }
 impl<T: Send + Sync> EventEmitter<T> {
-    fn listeners_mut(&mut self) -> &Arc<DashMap<String, Vec<Listener<T>>>> {
-        &self.listeners
+    /// Get the underlying DashMap Arc reference
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use std::sync::Arc;
+    /// use dashmap::DashMap;
+    /// use event_emitter::{EventEmitter, EventHandler, Listener};
+    ///
+    /// let mut emitter: EventEmitter<String> = EventEmitter::default();
+    ///  if let Some(events_map) = Arc::get_mut(emitter.events_mut()){
+    /// }
+    /// ```
+   pub fn events_mut(&mut self) -> &mut Arc<DashMap<String, Vec<Listener<T>>>> {
+        &mut self.events
     }
 }
 impl<T: Send+ Sync> EventHandler<T> for EventEmitter<T> {
+    /// Get a Vec containing the key of each active event entry register in the underlying DashMap.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use std::sync::Arc;
+    /// use event_emitter::{EventEmitter, EventHandler};
+    ///
+    /// let mut emitter: EventEmitter<String> = EventEmitter::default();
+    /// emitter.add_listener("event_one", Arc::new(|_|{})).expect("Failed to add");
+    /// emitter.add_listener("event_two", Arc::new(|_|{})).expect("Failed to add");
+    /// emitter.add_listener("event_three", Arc::new(|_|{})).expect("Failed to add");
+    /// ```
     fn event_names(&self) -> Vec<String> {
-        self.listeners.iter().map(|entry| entry.key().clone()).collect()
+        self.events.iter().map(|entry| entry.key().clone()).collect()
     }
+    /// Set the maximum number of listeners allowed for a specific event
+    ///
+    /// # Example
+    ///
+    /// ```
+   /// use event_emitter::{EventEmitter, EventHandler};
+    ///
+    /// let mut emitter: EventEmitter<String> = EventEmitter::default();
+    /// emitter.set_max_listeners(4);
+    /// ```
     fn set_max_listeners(&mut self, max: usize) { self.max_listeners = max; }
+
+    /// Get the current maximum listeners limit for events within the Event Emitter
+    ///
+    /// # Example
+    ///
+    /// ```
+   /// use event_emitter::{EventEmitter, EventHandler};
+    ///
+    /// let mut emitter: EventEmitter<String> = EventEmitter::default();
+    /// assert_eq!(emitter.max_listeners(), 10); // 10 is max_listeners default
+    /// ```
     fn max_listeners(&self) -> usize { self.max_listeners }
 
 
@@ -47,7 +117,7 @@ impl<T: Send+ Sync> EventHandler<T> for EventEmitter<T> {
     }
 
     fn add_limited_listener(&mut self, event_name: &str, callback: Callback<T>, limit: u64) -> Result<Listener<T>, EventError> {
-        let mut entry = self.listeners.entry(event_name.to_string()).or_default();
+        let mut entry = self.events.entry(event_name.to_string()).or_default();
         if entry.len() < self.max_listeners {
             let listener = Listener::new(
                 callback,
@@ -65,7 +135,7 @@ impl<T: Send+ Sync> EventHandler<T> for EventEmitter<T> {
 
 
     fn listener_count(&self, event_name: &str) -> usize {
-        self.listeners
+        self.events
             .get(event_name)
             .map(|entry| entry.len())
             .unwrap_or(0)
@@ -73,7 +143,7 @@ impl<T: Send+ Sync> EventHandler<T> for EventEmitter<T> {
 
 
     fn remove_listener(&mut self, event_name: &str, callback: &Listener<T>) -> Result<(), EventError> {
-        if let Some(mut entry) = self.listeners.get_mut(event_name) {
+        if let Some(mut entry) = self.events.get_mut(event_name) {
             let original_len = entry.len();
             entry.retain(|listener| !listener.eq(callback));
 
@@ -87,7 +157,7 @@ impl<T: Send+ Sync> EventHandler<T> for EventEmitter<T> {
     }
 
     fn remove_all_listeners(&mut self, event_name: &str) -> Result<(), EventError> {
-        if self.listeners.remove(event_name).is_some() {
+        if self.events.remove(event_name).is_some() {
             Ok(())
         } else {
             Err(EventError::EventNotFound)
@@ -95,7 +165,7 @@ impl<T: Send+ Sync> EventHandler<T> for EventEmitter<T> {
     }
 
     fn emit(&mut self, event_name: &str, payload: EventPayload<T>) -> Result<(), EventError> {
-        if let Some(mut entry) = self.listeners_mut().get_mut(event_name) {
+        if let Some(mut entry) = self.events_mut().get_mut(event_name) {
             for listener in entry.iter_mut().rev() {
                 listener.call(&payload);
             }
@@ -106,11 +176,11 @@ impl<T: Send+ Sync> EventHandler<T> for EventEmitter<T> {
     }
 
     fn emit_final(&mut self, event_name: &str, payload: EventPayload<T>) -> Result<(), EventError> {
-        if self.listeners_mut().contains_key(event_name){
-            for listener in self.listeners.get_mut(event_name).unwrap().iter_mut() {
+        if self.events_mut().contains_key(event_name){
+            for listener in self.events.get_mut(event_name).unwrap().iter_mut() {
                 listener.call(&payload);
             }
-            self.listeners_mut().remove(event_name);
+            self.events_mut().remove(event_name);
             return Ok(())
         }
         Err(EventError::EventNotFound)
@@ -122,7 +192,7 @@ impl<T: Send+ Sync> EventHandler<T> for EventEmitter<T> {
     /// Parallel Async: (parallel == true)
     ///  - Tasks run in parallel on different CPU cores
     fn emit_async<'a>(&'a mut self, event_name: &'a str, payload: EventPayload<T>, parallel: bool) -> Result<(), EventError> {
-        if let Some(mut entry) = self.listeners.get_mut(event_name) {
+        if let Some(mut entry) = self.events.get_mut(event_name) {
             for listener in entry.iter_mut().rev() {
                 if parallel {
                     listener.background_call(&payload);
@@ -138,8 +208,8 @@ impl<T: Send+ Sync> EventHandler<T> for EventEmitter<T> {
     }
 
     fn emit_final_async<'a>(&'a mut self, event_name: &'a str, payload: EventPayload<T>, parallel: bool) -> Result<(), EventError> {
-        if self.listeners_mut().contains_key(event_name) {
-            for listener in self.listeners_mut().get_mut(event_name).unwrap().iter_mut() {
+        if self.events_mut().contains_key(event_name) {
+            for listener in self.events_mut().get_mut(event_name).unwrap().iter_mut() {
                 if parallel {
                     listener.background_call(&payload);
                 } else {
@@ -147,7 +217,7 @@ impl<T: Send+ Sync> EventHandler<T> for EventEmitter<T> {
                 }
             }
 
-            self.listeners_mut().remove(event_name);
+            self.events_mut().remove(event_name);
             return Ok(());
         }
         Err(EventError::EventNotFound)
