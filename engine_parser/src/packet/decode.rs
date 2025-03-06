@@ -77,14 +77,14 @@ impl Packet {
             RawData::Text(txt) => {
                 if txt.is_empty() { return Vec::new(); }
 
-                let chunks: Vec<String> = txt
+                let mut chunks: Vec<String> = txt
                     .split(char::from(SEPARATOR_BYTE))
                     .map(|s| s.to_owned())
                     .collect();
                 // println!("{:?}", chunks);
                 let mut payload = Vec::<Self>::with_capacity(chunks.len());
 
-                for chunk in chunks.iter() {
+                for chunk in chunks.drain(..) {
                     let decoded = Self::decode(RawData::Text(chunk.into()));
                     payload.push(decoded);
                 }
@@ -93,15 +93,15 @@ impl Packet {
             RawData::Binary(bin) => {
                 if bin.is_empty() { return Vec::new(); }
 
-                let chunks: Vec<BinaryType> = bin
-                    .split(SEPARATOR_BYTE)
+                let mut chunks: Vec<BinaryType> = bin
+                    .split(|n| n == &SEPARATOR_BYTE)
                     .map(|s| s.to_vec())
                     .collect();
                 // println!("{:?}", chunks);
                 let mut payload = Vec::<Self>::with_capacity(chunks.len());
 
-                for chunk in chunks.iter() {
-                    let decoded = Self::decode(RawData::Binary(chunk.into()));
+                for chunk in chunks.drain(..) {
+                    let decoded = Self::decode(RawData::Binary(chunk));
                     payload.push(decoded);
                 }
                 payload
