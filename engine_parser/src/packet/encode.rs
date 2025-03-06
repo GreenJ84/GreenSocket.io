@@ -57,12 +57,13 @@ impl Packet {
         res
     }
 
+    /// Todo: Debug functions, expected result to be reversed base on supports_binary flagging
     pub fn encode_payload(packets: &[Self], supports_binary: bool) -> RawData {
         let size = packets.len();
         return if supports_binary {
             let mut payload = String::with_capacity(packets.len() * 2);
             for (i, packet) in packets.iter().enumerate() {
-                if let Some(RawData::Text(encoded)) = packet.encode(supports_binary) {
+                if let RawData::Text(encoded) = packet.encode(supports_binary) {
                     payload.push_str(&encoded);
                 }
                 if i < size - 1 {
@@ -73,7 +74,7 @@ impl Packet {
         } else {
             let mut payload = Vec::<u8>::new();
             for (i, packet) in packets.iter().enumerate() {
-                if let Some(RawData::Binary(encoded)) = packet.encode(supports_binary) {
+                if let RawData::Binary(encoded) = packet.encode(supports_binary) {
                      payload.extend(&encoded);
                 }
                 if i < size - 1 {
