@@ -14,12 +14,6 @@ pub enum RawData {
     Binary(BinaryType)
 }
 impl RawData {
-    pub fn inner<T>(self) -> T {
-        match self {
-            RawData::Binary(b) => b,
-            RawData::Text(s) => s,
-        }
-    }
     pub fn len(&self) -> usize {
         match self {
             RawData::Binary(b) => b.len(),
