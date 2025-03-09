@@ -1,7 +1,8 @@
 use base64::Engine;
 use base64::engine::general_purpose;
 
-use crate::{packet::*, constants::*};
+use crate::{*, packet::*, constants::*};
+
 
 #[cfg(test)]
 mod single_packet_decoding_tests {
@@ -115,19 +116,34 @@ mod single_packet_decoding_tests {
 mod payload_decoding_tests{
     use super::*;
 
-    fn binary(i: u32, bin: BinaryType) -> String {
+    fn binary(i: u32, bin: BinaryType) -> BinaryType {
+        let mut data = vec![BINARY_MASK, char::from_digit(i % 6, 10).unwrap() as u8];
+        data.extend(bin);
+        data.push(SEPARATOR_BYTE);
+        data
+    }
+    fn binary_as_text(i: u32, bin: BinaryType) -> String {
         let mut data = format!("b{}", char::from_digit(i % 6, 10).unwrap());
         data.push_str(&general_purpose::URL_SAFE.encode(bin));
         data.push(SEPARATOR_BYTE as char);
         data
     }
-    fn text(i: u32, text: &str) -> String { format!("{}{}{}", char::from_digit(i % 6, 10).unwrap(), text, SEPARATOR_BYTE as char) }
+
+    fn text_as_binary(i: u32, text: &str) -> BinaryType {
+        let mut data = vec![PLAIN_TEXT_MASK, char::from_digit(i % 6, 10).unwrap() as u8];
+        data.extend(text.as_bytes());
+        data.push(SEPARATOR_BYTE);
+        data
+    }
+    fn text(i: u32, text: &str) -> String {
+        format!("{}{}{}", char::from_digit(i % 6, 10).unwrap(), text, SEPARATOR_BYTE as char)
+    }
 
 
     #[test]
     fn decode_empty_payload() {
         assert_eq!(
-            Packet::decode_payload("".into()),
+            Packet::decode_payload(RawData::Text(String::new())),
             Vec::new()
         );
     }
@@ -136,9 +152,10 @@ mod payload_decoding_tests{
     fn decode_payload_with_no_data_binary_packets() {
         let payload = (0..20)
             .map(|i| binary(i, Vec::new()))
-            .collect::<Vec<String>>()
-            .join("");
-        let decoded_payload = Packet::decode_payload(payload);
+            .flatten()
+            .collect::<BinaryType>();
+
+        let decoded_payload = Packet::decode_payload(RawData::Binary(payload));
         for i in 0..20u32 {
             assert_eq!(
                 decoded_payload[i as usize],
@@ -158,7 +175,7 @@ mod payload_decoding_tests{
             .map(|i| text(i, ""))
             .collect::<Vec<String>>()
             .join("");
-        let decoded_payload = Packet::decode_payload(payload);
+        let decoded_payload = Packet::decode_payload(RawData::Text(payload));
         for i in 0..20u32 {
             assert_eq!(
                 decoded_payload[i as usize],
@@ -175,10 +192,10 @@ mod payload_decoding_tests{
     #[test]
     fn decode_payload_with_binary_packets() {
         let payload = (0..20)
-            .map(|i| binary(i, Vec::from("Hello".as_bytes())))
+            .map(|i| binary_as_text(i, Vec::from("Hello".as_bytes())))
             .collect::<Vec<String>>()
             .join("");
-        let decoded_payload = Packet::decode_payload(payload);
+        let decoded_payload = Packet::decode_payload(RawData::Text(payload));
         for i in 0..20u32 {
             assert_eq!(
                 decoded_payload[i as usize],
@@ -198,7 +215,7 @@ mod payload_decoding_tests{
             .map(|i|  text(i, "Hello"))
             .collect::<Vec<String>>()
             .join("");
-        let decoded_payload = Packet::decode_payload(payload);
+        let decoded_payload = Packet::decode_payload(RawData::Text(payload));
         for i in 0..20u32 {
             assert_eq!(
                 decoded_payload[i as usize],
@@ -217,14 +234,14 @@ mod payload_decoding_tests{
         let payload = (0..20)
             .map(|i: u32|
                 if i % 2 == 0 {
-                    binary(i, "Binary".as_bytes().into())
+                    binary_as_text(i, "Binary".as_bytes().into())
                 } else {
                     text(i, "Text")
                 }
             )
             .collect::<Vec<String>>()
             .join("");
-        let decoded_payload = Packet::decode_payload(payload);
+        let decoded_payload = Packet::decode_payload(RawData::Text(payload));
 
         for i in 0..20u32 {
             assert_eq!(
@@ -247,9 +264,9 @@ mod payload_decoding_tests{
     fn decode_payload_packets_with_large_data_binary_packets() {
         let payload = (0..20)
             .map(|i|  binary(i, vec![0x44].repeat(i16::MAX as usize)))
-            .collect::<Vec<String>>()
-            .join("");
-        let decoded_payload = Packet::decode_payload(payload);
+            .flatten()
+            .collect::<BinaryType>();
+        let decoded_payload = Packet::decode_payload(RawData::Binary(payload));
         for i in 0..20u32 {
             assert_eq!(
                 decoded_payload[i as usize],
@@ -269,7 +286,7 @@ mod payload_decoding_tests{
             .map(|i|  text(i, &"Hello".repeat(i8::MAX as usize)))
             .collect::<Vec<String>>()
             .join("");
-        let decoded_payload = Packet::decode_payload(payload);
+        let decoded_payload = Packet::decode_payload(RawData::Text(payload));
         for i in 0..20u32 {
             assert_eq!(
                 decoded_payload[i as usize],
@@ -288,14 +305,14 @@ mod payload_decoding_tests{
         let payload = (0..20)
             .map(|i: u32|
             if i % 2 == 0 {
-                binary(i, vec![0x44].repeat(i16::MAX as usize))
+                binary_as_text(i, vec![0x44].repeat(i16::MAX as usize))
             } else {
                 text(i, &"Hello".repeat(i8::MAX as usize))
             }
             )
             .collect::<Vec<String>>()
             .join("");
-        let decoded_payload = Packet::decode_payload(payload);
+        let decoded_payload = Packet::decode_payload(RawData::Text(payload));
 
         for i in 0..20u32 {
             assert_eq!(
@@ -319,14 +336,14 @@ mod payload_decoding_tests{
         let payload = (0..i16::MAX as u32)
             .map(|i|
             if i % 2 == 0 {
-                binary(i, vec![0x44])
+                binary_as_text(i, vec![0x44])
             } else {
                 text(i, &"Hello")
             }
             )
             .collect::<Vec<String>>()
             .join("");
-        let decoded_payload = Packet::decode_payload(payload);
+        let decoded_payload = Packet::decode_payload(RawData::Text(payload));
 
         for i in 0..i16::MAX as u32 {
             assert_eq!(

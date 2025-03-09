@@ -123,7 +123,7 @@ mod payload_encoding_tests{
         let packet1 = build_packet(PacketType::Ping, None);
         let packets = (0..20).map(|_| packet1.clone()).collect::<Vec<Packet>>();
 
-        let encoded_payload = Packet::encode_payload(&packets, true);
+        let encoded_payload = Packet::encode_payload(&packets, false);
 
         // Should be a
         let mut expected_payload = String::new();
