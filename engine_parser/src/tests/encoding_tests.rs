@@ -1,7 +1,15 @@
-use crate::{packet::*, constants::*};
-
 use base64::Engine;
 use base64::engine::general_purpose;
+
+use crate::{*, constants::*};
+
+fn build_packet(packet_type: PacketType, data: Option<RawData>) -> Packet{
+    Packet::new(
+        packet_type,
+        Some(PacketOptions { compress: false }),
+        data,
+    )
+}
 
 #[cfg(test)]
 mod single_packet_encoding_tests {
@@ -9,11 +17,7 @@ mod single_packet_encoding_tests {
 
     #[test]
     fn encode_binary_packet_with_binary_support() {
-        let packet = Packet::new(
-            PacketType::Message,
-            Some(PacketOptions { compress: false }),
-            Some(RawData::Binary(vec![1, 2, 3, 4, 5])),
-        );
+        let packet = build_packet(PacketType::Message, Some(RawData::Binary(vec![1, 2, 3, 4, 5])));
 
         let encoded = packet.encode(true);
         match encoded {
@@ -26,11 +30,7 @@ mod single_packet_encoding_tests {
 
     #[test]
     fn encode_binary_packet_without_binary_support() {
-        let packet = Packet::new(
-            PacketType::Message,
-            Some(PacketOptions { compress: false }),
-            Some(RawData::Binary(vec![1, 2, 3, 4, 5])),
-        );
+        let packet = build_packet(PacketType::Message, Some(RawData::Binary(vec![1, 2, 3, 4, 5])));
 
         let encoded = packet.encode(false);
         match encoded {
@@ -43,11 +43,7 @@ mod single_packet_encoding_tests {
 
     #[test]
     fn encode_text_data_with_binary_support() {
-        let packet = Packet::new(
-            PacketType::Message,
-            Some(PacketOptions { compress: false }),
-            Some(RawData::Text("Hello, world!".to_string())),
-        );
+        let packet = build_packet(PacketType::Message, Some(RawData::Text("Hello, world!".to_string())));
 
         let encoded = packet.encode(true);
         match encoded {
@@ -60,11 +56,7 @@ mod single_packet_encoding_tests {
 
     #[test]
     fn encode_text_data_without_binary_support() {
-        let packet = Packet::new(
-            PacketType::Message,
-            Some(PacketOptions { compress: false }),
-            Some(RawData::Text("Hello, world!".to_string())),
-        );
+        let packet = build_packet(PacketType::Message, Some(RawData::Text("Hello, world!".to_string())));
 
         let encoded = packet.encode(false);
         match encoded {
@@ -76,12 +68,8 @@ mod single_packet_encoding_tests {
     }
 
     #[test]
-    fn encode_empty_data() {
-        let packet = Packet::new(
-            PacketType::Ping,
-            None,
-            None,
-        );
+    fn encode_no_data() {
+        let packet = build_packet(PacketType::Ping, None);
 
         let encoded = packet.encode(true);
         match encoded {
@@ -99,11 +87,7 @@ mod forced_binary_encoding_tests{
 
     #[test]
     fn force_binary_encode_binary_data() {
-        let packet = Packet::new(
-            PacketType::Message,
-            Some(PacketOptions { compress: false }),
-            Some(RawData::Binary(vec![1, 2, 3, 4, 5])),
-        );
+        let packet = build_packet(PacketType::Message, Some(RawData::Binary(vec![1, 2, 3, 4, 5])));
 
         let encoded = packet.encode_binary();
         assert_eq!(encoded, vec![BINARY_MASK, PacketType::Message.as_char() as u8, 1, 2, 3, 4, 5]);
@@ -111,11 +95,7 @@ mod forced_binary_encoding_tests{
 
     #[test]
     fn force_binary_encode_text_data() {
-        let packet = Packet::new(
-            PacketType::Message,
-            Some(PacketOptions { compress: false }),
-            Some(RawData::Text("Hello world!".into())),
-        );
+        let packet = build_packet(PacketType::Message, Some(RawData::Text("Hello world!".into())));
 
         let encoded = packet.encode_binary();
         let mut expected = Vec::from([PLAIN_TEXT_MASK]);
@@ -125,11 +105,7 @@ mod forced_binary_encoding_tests{
 
     #[test]
     fn force_binary_encode_no_data() {
-        let packet = Packet::new(
-            PacketType::Open,
-            Some(PacketOptions { compress: false }),
-            None,
-        );
+        let packet = build_packet(PacketType::Open, None);
 
         let encoded = packet.encode_binary();
         let mut expected = Vec::from([PLAIN_TEXT_MASK]);
@@ -144,13 +120,10 @@ mod payload_encoding_tests{
 
     #[test]
     fn encode_payload_packets_with_no_data() {
-        let packet1 = Packet::new(
-            PacketType::Ping,
-            None,
-            None,
-        );
+        let packet1 = build_packet(PacketType::Ping, None);
         let packets = (0..20).map(|_| packet1.clone()).collect::<Vec<Packet>>();
-        let encoded_payload = Packet::encode_payload(&packets);
+
+        let encoded_payload = Packet::encode_payload(&packets, true);
 
         // Should be a
         let mut expected_payload = String::new();
@@ -158,27 +131,19 @@ mod payload_encoding_tests{
             expected_payload.push_str(&format!("2{}", SEPARATOR_BYTE as char));
         }
         expected_payload.pop();
-        assert_eq!(encoded_payload, expected_payload);
+        assert_eq!(encoded_payload, RawData::Text(expected_payload));
     }
 
 
     #[test]
     fn encode_payload_packets_with_mixed_data() {
-        let packet1 = Packet::new(
-            PacketType::Message,
-            Some(PacketOptions { compress: false }),
-            Some(RawData::Binary(vec![1, 2, 3])),
-        );
-        let packet2 = Packet::new(
-            PacketType::Ping,
-            None,
-            Some(RawData::Text("Ping".to_string())),
-        );
+        let packet1 = build_packet(PacketType::Message, Some(RawData::Binary(vec![1, 2, 3])));
+        let packet2 = build_packet(PacketType::Ping, Some(RawData::Text("Ping".to_string())));
 
         let mut packets = vec![];
         for _ in 0..20 { packets.extend_from_slice(&vec![packet1.clone(), packet2.clone()]) }
 
-        let encoded_payload = Packet::encode_payload(&packets);
+        let encoded_payload = Packet::encode_payload(&packets, false);
 
         let mut expected_payload= String::new();
         for _ in 0..20{
@@ -193,51 +158,43 @@ mod payload_encoding_tests{
         }
         expected_payload.pop();
 
-        assert_eq!(encoded_payload, expected_payload);
+        assert_eq!(encoded_payload, RawData::Text(expected_payload));
     }
 
     #[test]
     fn encode_payload_packets_with_large_data() {
         let data = (0..i16::MAX).map(|_| 0x44).collect::<Vec<u8>>();
-        let packet1 = Packet::new(
-            PacketType::Ping,
-            None,
-            Some(RawData::Binary(data)),
-        );
-
+        let packet1 = build_packet(PacketType::Ping, Some(RawData::Binary(data.clone())));
         let packets = (0..20).map(|_| packet1.clone()).collect::<Vec<Packet>>();
-        let encoded_payload = Packet::encode_payload(&packets);
 
-        let mut expected_payload = String::new();
+        let encoded_payload = Packet::encode_payload(&packets, true);
+
+        let mut expected_payload = Vec::new();
         for _ in 0..20{
-            expected_payload.push_str("b2");
-            expected_payload.push_str(&general_purpose::URL_SAFE.encode((0..i16::MAX).map(|_| 0x44).collect::<Vec<u8>>()));
-            expected_payload.push(SEPARATOR_BYTE as char);
+            expected_payload.extend([BINARY_MASK, '2' as u8]);
+            expected_payload.extend(data.clone());
+            expected_payload.push(SEPARATOR_BYTE);
         }
         expected_payload.pop();
-        assert_eq!(encoded_payload, expected_payload);
+        assert_eq!(encoded_payload, RawData::Binary(expected_payload));
     }
 
     #[test]
     fn encode_large_payload() {
         let data = (0..20).map(|_| 0x44).collect::<Vec<u8>>();
-        let packet1 = Packet::new(
-            PacketType::Ping,
-            None,
-            Some(RawData::Binary(data)),
-        );
-
+        let packet1 = build_packet(PacketType::Ping, Some(RawData::Binary(data.clone())) );
         let packets = (0..i16::MAX).map(|_| packet1.clone()).collect::<Vec<Packet>>();
-        let encoded_payload = Packet::encode_payload(&packets);
+
+        let encoded_payload = Packet::encode_payload(&packets, false);
 
         let mut expected_payload = String::new();
         for _ in 0..i16::MAX{
             expected_payload.push_str("b2");
-            expected_payload.push_str(&general_purpose::URL_SAFE.encode((0..20).map(|_| 0x44).collect::<Vec<u8>>()));
+            expected_payload.push_str(&general_purpose::URL_SAFE.encode(data.clone()));
             expected_payload.push(SEPARATOR_BYTE as char);
         }
         expected_payload.pop();
-        assert_eq!(encoded_payload, expected_payload);
+        assert_eq!(encoded_payload, RawData::Text(expected_payload));
     }
 
 
@@ -245,9 +202,9 @@ mod payload_encoding_tests{
     #[test]
     fn encode_empty_payload() {
         let packets: Vec<Packet> = Vec::new();
-        let encoded_payload = Packet::encode_payload(&packets);
+        let encoded_payload = Packet::encode_payload(&packets, true);
 
-        assert!(encoded_payload.is_empty());
+        assert_eq!(encoded_payload.len(), 0);
     }
 }
 
