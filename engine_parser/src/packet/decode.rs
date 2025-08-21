@@ -13,24 +13,23 @@ impl Packet {
             RawData::Binary(data) => {
                 match data[0] {
                     BINARY_MASK => {
-                        if let Some(packet_type) = PacketType::from_char(char::from(data[1])) {
-                            Self {
+                        match PacketType::from_char(char::from(data[1])) {
+                            Some(packet_type) => Self {
                                 _type: packet_type,
                                 options: None,
                                 data: if data.len() < 3 { None } else {
                                     Some(RawData::Binary(Vec::from(&data[2..])))
                                 },
+                            },
+                            _ => {
+                                return Packet::error("Invalid binary packet type flag");
                             }
-                        } else {
-                            return Packet::error("Invalid binary packet type flag");
-                        }
+                        },
                     },
                     PLAIN_TEXT_MASK => {
-                        let encoded = String::from_utf8(Vec::from(&data[1..]));
-                        return if let Err(e) = encoded {
-                            Packet::error(&format!("Binary parsing error: {:?}", e))
-                        } else {
-                            Packet::decode(RawData::Text(encoded.unwrap()))
+                        match String::from_utf8(Vec::from(&data[1..])) {
+                            Ok(text_data) => Packet::decode(RawData::Text(text_data)),
+                            Err(e) => Packet::error(&format!("Binary parsing error: {:?}", e))
                         }
                     },
                     _ => { Self::error("Invalid binary packet - missing association flag") }
