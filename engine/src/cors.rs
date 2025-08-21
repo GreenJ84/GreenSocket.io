@@ -33,20 +33,20 @@ impl<T> AllOrSome<T> {
     pub fn all() -> Self {
         Self::All
     }
-    pub fn some(items: &[T]) -> Self{
+    pub fn some(items: T) -> Self {
         Self::Some(items)
     }
-    pub fn is_all(&self) -> bool{
-        return if let Some(_) = self { false } else { true };
+    pub fn is_all(&self) -> bool {
+        matches!(self, Self::All)
     }
-    pub fn is_some(&self) -> bool{
-        return if let Some(_) = self { true } else { false };
+    pub fn is_some(&self) -> bool {
+        matches!(self, Self::Some(_))
     }
     pub fn unwrap(self) -> Result<T, ()> {
-        if let Some(t) = self {
-            return Ok(t)
+        match self {
+            Self::Some(t) => Ok(t),
+            Self::All => Err(())
         }
-        Err(())
     }
 }
 
@@ -116,24 +116,27 @@ impl Service<EngineRequest> for CorsMiddleware {
     fn call(&mut self, req: EngineRequest) -> Self::Future {
         if self.is_preflight_request(&req) {
             let mut res = EngineResponse::new(RawData::Text("Ok".to_string()));
-            res.headers_mut().extend(self.generate_cors_headers(&req));
+            let cors_headers = self.generate_cors_headers(&req);
+            for (name, value) in cors_headers {
+                if let (Ok(header_name), Ok(header_value)) = (name.parse(), value.parse()) {
+                    res.headers_mut().insert(header_name, header_value);
+                }
+            }
             *res.status_mut() = StatusCode::OK;
             return Box::new(futures::future::ok(res));
         }
 
-        let mut response = self.call(req.clone());
-
-        // Check for CORS-related issues and add appropriate headers
+        // TODO: This needs to be implemented to call the next middleware/handler
+        // For now, return a basic response to prevent infinite recursion
+        let mut res = EngineResponse::new(RawData::Text("Not Implemented".to_string()));
         let cors_headers = self.generate_cors_headers(&req);
-
-        let response_with_headers = response.map(|mut res| {
-            for (header, value) in cors_headers {
-                res.headers_mut().insert(header, value);
+        for (name, value) in cors_headers {
+            if let (Ok(header_name), Ok(header_value)) = (name.parse(), value.parse()) {
+                res.headers_mut().insert(header_name, header_value);
             }
-            res
-        });
-
-        Box::new(response_with_headers)
+        }
+        *res.status_mut() = StatusCode::NOT_IMPLEMENTED;
+        Box::new(futures::future::ok(res))
     }
 }
 
@@ -145,11 +148,24 @@ impl CorsMiddleware{
     fn generate_cors_headers(&self, req: &EngineRequest) -> Vec<(String, String)> {
         let mut headers = Vec::new();
 
-        // Access-Control-Allow-Origin
-        let origin = req.headers().get("Origin");
-        if let Some(origin) = origin {
-            let origin_str = origin.to_str().unwrap_or_default();
-            headers.push(("Access-Control-Allow-Origin".to_string(), origin_str.to_string()));
+        // Access-Control-Allow-Origin - VALIDATE BEFORE SETTING
+        if let Some(origin_header) = req.headers().get("Origin") {
+            let origin_str = origin_header.to_str().unwrap_or_default();
+            
+            // Validate the origin before setting the header
+            match self.validate_origin(origin_str) {
+                Ok(validated_origin) => {
+                    if self.options.send_wildcard && matches!(self.options.allowed_origins, AllOrSome::All) {
+                        headers.push(("Access-Control-Allow-Origin".to_string(), "*".to_string()));
+                    } else {
+                        headers.push(("Access-Control-Allow-Origin".to_string(), validated_origin.to_string()));
+                    }
+                }
+                Err(_) => {
+                    // Don't set the header if origin is not allowed
+                    // This prevents CORS attacks
+                }
+            }
         }
 
         // Access-Control-Allow-Methods
@@ -165,9 +181,12 @@ impl CorsMiddleware{
         };
         headers.push(("Access-Control-Allow-Headers".to_string(), allowed_headers));
 
-        // Access-Control-Allow-Credentials
+        // Access-Control-Allow-Credentials - SECURITY: Never allow wildcard origin with credentials
         if self.options.allow_credentials {
-            headers.push(("Access-Control-Allow-Credentials".to_string(), "true".to_string()));
+            if !self.options.send_wildcard {
+                headers.push(("Access-Control-Allow-Credentials".to_string(), "true".to_string()));
+            }
+            // Silently ignore credentials=true when wildcard is used (security best practice)
         }
 
         // Access-Control-Expose-Headers
@@ -201,8 +220,19 @@ impl CorsMiddleware{
                     if exact.contains(origin) { return Ok(origin); }
                 }
                 if let Some(regex) = &origins.regex {
-                    // Check against regex
-                    if regex.iter().any(|r| regex::Regex::new(r).unwrap().is_match(origin)) {
+                    // Check against regex - handle compilation errors safely
+                    let matches = regex.iter().any(|r| {
+                        match regex::Regex::new(r) {
+                            Ok(compiled_regex) => compiled_regex.is_match(origin),
+                            Err(_) => {
+                                // Log the error but don't crash - treat as no match
+                                eprintln!("Warning: Invalid regex pattern: {}", r);
+                                false
+                            }
+                        }
+                    });
+                    
+                    if matches {
                         Ok(origin)
                     } else {
                         Err(CorsError::OriginNotAllowed(origin.to_string()))
