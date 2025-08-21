@@ -42,15 +42,25 @@ impl Packet {
         let mut res = Vec::<u8>::new();
         match &self.data {
             Some(RawData::Binary(_)) => {
-                if let RawData::Binary(encoded_data) = self.encode(true){
-                    res.extend_from_slice(&encoded_data);
-                } else { panic!("Broken encoding implementation") };
+                match self.encode(true) {
+                    RawData::Binary(encoded_data) => res.extend_from_slice(&encoded_data),
+                    _ => {
+                        // This should never happen, but handle gracefully
+                        eprintln!("Warning: Binary encoding returned non-binary data");
+                        res.extend_from_slice(&[PLAIN_TEXT_MASK, self._type.as_char() as u8]);
+                    }
+                }
             },
             Some(RawData::Text(_)) => {
                 res.push(PLAIN_TEXT_MASK);
-                if let RawData::Text(encoded_text) = self.encode(false) {
-                    res.extend_from_slice(&encoded_text.into_bytes());
-                } else { panic!("Broken encoding implementation") };
+                match self.encode(false) {
+                    RawData::Text(encoded_text) => res.extend_from_slice(&encoded_text.into_bytes()),
+                    _ => {
+                        // This should never happen, but handle gracefully
+                        eprintln!("Warning: Text encoding returned non-text data");
+                        res.extend_from_slice(&[self._type.as_char() as u8]);
+                    }
+                }
             }
             None => { res.extend_from_slice(&[PLAIN_TEXT_MASK, self._type.as_char() as u8]); }
         }
