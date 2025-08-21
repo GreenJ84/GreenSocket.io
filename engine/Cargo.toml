@@ -21,3 +21,15 @@ chrono = "0.4.39"
 serde = { version = "1.0.217", features = ["derive"] }
 url = "2.5.4"
 regex = "1.11.1"
+futures = "0.3.31"
+
+
+#[cfg(feature = "tower")]
+tower = "0.5.2"
+#[cfg(feature = "rocket")]
+rocket = { version = "0.5", features = ["json", "tls"] }
+
+[features]
+default = []
+rocket = []
+tower = []
