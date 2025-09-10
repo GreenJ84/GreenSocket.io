@@ -2,7 +2,7 @@
 members = [
     "engine",
     "engine_client",
-    "engine_parser",
+    "protocol",
 ]
 resolver = "2"
 
