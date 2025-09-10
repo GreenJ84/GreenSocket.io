@@ -70,9 +70,15 @@ impl PacketType {
     }
 }
 
-#[derive(PartialEq, Eq, Debug, Clone)]
-pub struct PacketOptions {
-    pub compress: bool,
+
+
+pub const MAX_PACKET_SIZE: usize = 1024 * 1024;
+
+/// Error type for packet creation and validation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PacketError {
+    /// Packet data exceeds the maximum allowed size.
+    DataTooLarge,
 }
 
 #[derive(PartialEq, Eq, Debug, Clone)]
@@ -82,20 +88,42 @@ pub struct Packet {
     pub data: Option<RawData>,
 }
 impl Packet {
+    /// Creates a new packet with validation.
+    /// Returns an error if the data exceeds MAX_PACKET_SIZE.
     pub fn new(
         _type: PacketType,
         options: Option<PacketOptions>,
         data: Option<RawData>
-    ) -> Self{
-        return Self { _type, options, data };
+    ) -> Result<Self, PacketError> {
+        if let Some(ref d) = data {
+            if d.len() > MAX_PACKET_SIZE {
+                return Err(PacketError::DataTooLarge);
+            }
+        }
+        Ok(Self { _type, options, data })
     }
 
     pub fn error(message: &str) -> Self {
         Self {
             _type: PacketType::Error,
             options: None,
-            data: Some(RawData::Binary(message.bytes().collect())),
+            data: Some(RawData::Text(message.to_string())),
         }
     }
 }
 
+
+
+// #[cfg(not(feature = "sequencing"))]
+#[derive(PartialEq, Eq, Debug, Clone)]
+pub struct PacketOptions {
+    pub compress: bool,
+}
+
+// #[cfg(feature = "sequencing")]
+// #[derive(PartialEq, Eq, Debug, Clone)]
+// pub struct PacketOptions {
+//     pub compress: bool,
+//     pub sequence: Option<usize>,
+//     pub total_chunks: Option<usize>,
+// }

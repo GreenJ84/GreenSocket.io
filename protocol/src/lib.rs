@@ -8,6 +8,7 @@ pub use packet::{
     Packet,
     PacketType,
     PacketOptions,
+    MAX_PACKET_SIZE,
     encoding_stream::PacketEncoderStream,
     decoding_stream::PacketDecoderStream,
 };
