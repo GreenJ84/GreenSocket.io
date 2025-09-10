@@ -354,7 +354,6 @@ dependencies = [
  "async-trait",
  "bytes",
  "chrono",
- "engine_parser",
  "flate2",
  "futures",
  "http 1.2.0",
@@ -362,6 +361,7 @@ dependencies = [
  "hyper 1.6.0",
  "hyper-util",
  "log",
+ "protocol",
  "regex",
  "rocket",
  "rocket_ws",
@@ -379,19 +379,6 @@ dependencies = [
  "wasm-bindgen",
  "wasm-bindgen-test",
  "wee_alloc",
-]
-
-[[package]]
-name = "engine_parser"
-version = "0.1.0"
-dependencies = [
- "base64 0.22.1",
- "futures",
- "pin-project",
- "serde",
- "serde_json",
- "tokio",
- "tokio-stream",
 ]
 
 [[package]]
@@ -1302,6 +1289,19 @@ dependencies = [
  "syn",
  "version_check",
  "yansi",
+]
+
+[[package]]
+name = "protocol"
+version = "0.1.0"
+dependencies = [
+ "base64 0.22.1",
+ "futures",
+ "pin-project",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tokio-stream",
 ]
 
 [[package]]

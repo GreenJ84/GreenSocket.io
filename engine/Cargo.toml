@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-engine_parser = { path = "../engine_parser" }
+protocol = { path = "../protocol" }
 
 hyper = { version = "1.6.0", feateures = ["full"] }
 hyper-util = { version = "0.1.10", features = ["full"] }
