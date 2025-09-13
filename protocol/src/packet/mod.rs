@@ -1,9 +1,11 @@
-pub(crate) mod encode;
-pub(crate) mod decode;
-pub(crate) mod encoding_stream;
-pub(crate) mod decoding_stream;
+pub(crate) mod options;
+pub(crate) mod types;
+
+use options::PacketOptions;
+use types::PacketType;
 
 use crate::constants::RawData;
+use crate::error::ProtocolError;
 
 /// Maximum allowed packet size (1 MB).
 pub const MAX_PACKET_SIZE: usize = 1024 * 1024;
@@ -25,10 +27,10 @@ impl Packet {
         _type: PacketType,
         options: Option<PacketOptions>,
         data: Option<RawData>
-    ) -> Result<Self, PacketError> {
+    ) -> Result<Self, ProtocolError> {
         if let Some(ref d) = data {
             if d.len() > MAX_PACKET_SIZE {
-                return Err(PacketError::DataTooLarge);
+                return Err(ProtocolError::DataTooLarge);
             }
         }
         Ok(Self { _type, options, data })
