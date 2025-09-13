@@ -21,7 +21,7 @@ pub enum PacketType {
     /// No-operation packet.
     Noop = 6,
     /// Error packet.
-    Error = -1,
+    Error = 255,
 }
 
 impl TryFrom<&str> for PacketType {
@@ -42,10 +42,10 @@ impl TryFrom<&str> for PacketType {
   }
 }
 
-impl TryFrom<i8> for PacketType {
+impl TryFrom<u8> for PacketType {
   type Error = ProtocolError;
 
-  fn try_from(c: i8) -> Result<Self, ProtocolError> {
+  fn try_from(c: u8) -> Result<Self, ProtocolError> {
     match c {
       0 => Ok(Self::Open),
       1 => Ok(Self::Close),
@@ -54,7 +54,7 @@ impl TryFrom<i8> for PacketType {
       4 => Ok(Self::Message),
       5 => Ok(Self::Upgrade),
       6 => Ok(Self::Noop),
-      -1 => Ok(Self::Error),
+      255 => Ok(Self::Error),
       _ => Err(ProtocolError::InvalidType),
     }
   }
@@ -76,7 +76,7 @@ impl PacketType {
   }
 
   /// Returns the integer representation of the packet type.
-  pub fn as_int(&self) -> i8 {
+  pub fn as_int(&self) -> u8 {
     match self {
       Self::Open => 0,
       Self::Close => 1,
@@ -85,7 +85,7 @@ impl PacketType {
       Self::Message => 4,
       Self::Upgrade => 5,
       Self::Noop => 6,
-      Self::Error => -1,
+      Self::Error => 255,
     }
   }
 }
