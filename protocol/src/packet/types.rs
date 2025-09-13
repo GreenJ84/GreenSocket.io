@@ -1,5 +1,7 @@
 use std::convert::TryFrom;
 
+use crate::error::ProtocolError;
+
 /// Represents the type of packet.
 /// Each variant corresponds to a specific packet type in the protocol.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -23,9 +25,9 @@ pub enum PacketType {
 }
 
 impl TryFrom<&str> for PacketType {
-  type Error = ();
+  type Error = ProtocolError;
 
-  fn try_from(s: &str) -> Result<Self, Self::Error> {
+  fn try_from(s: &str) -> Result<Self, ProtocolError> {
     match s {
       "open" => Ok(Self::Open),
       "close" => Ok(Self::Close),
@@ -35,15 +37,15 @@ impl TryFrom<&str> for PacketType {
       "upgrade" => Ok(Self::Upgrade),
       "noop" => Ok(Self::Noop),
       "error" => Ok(Self::Error),
-      _ => Err(()),
+      _ => Err(ProtocolError::InvalidType),
     }
   }
 }
 
 impl TryFrom<i8> for PacketType {
-  type Error = ();
+  type Error = ProtocolError;
 
-  fn try_from(c: i8) -> Result<Self, Self::Error> {
+  fn try_from(c: i8) -> Result<Self, ProtocolError> {
     match c {
       0 => Ok(Self::Open),
       1 => Ok(Self::Close),
@@ -53,7 +55,7 @@ impl TryFrom<i8> for PacketType {
       5 => Ok(Self::Upgrade),
       6 => Ok(Self::Noop),
       -1 => Ok(Self::Error),
-      _ => Err(()),
+      _ => Err(ProtocolError::InvalidType),
     }
   }
 }
