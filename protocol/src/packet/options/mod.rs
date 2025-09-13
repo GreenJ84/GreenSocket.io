@@ -9,9 +9,9 @@ pub struct PacketOptions {
     /// Whether the packet is encrypted.
     pub encrypted: bool,
     /// The sequence number of the packet (for chunked transfer).
-    pub sequence: Option<usize>,
+    pub sequence: Option<u16>,
     /// The total number of chunks in the packet (for chunked transfer).
-    pub total_chunks: Option<usize>,
+    pub total_chunks: Option<u16>,
 }
 
 
@@ -34,14 +34,13 @@ impl PacketOptions {
     }
 
     /// Sets chunking information for the packet.
-    pub fn with_chunking(mut self, sequence: usize, total_chunks: usize) -> Self {
-        if total_chunks < 2 || sequence < 1 { return self }
-        else if sequence > total_chunks {
-            eprintln!("Invalid chunking parameters: sequence must be less than total_chunks and total_chunks must be greater than 0");
-            return self;
+    pub fn with_chunking(mut self, sequence: u16, total_chunks: u16) -> Result<Self, Self> {
+        if total_chunks < 2 || sequence > total_chunks || sequence < 1 {
+            eprintln!("Invalid chunking parameters");
+            return Err(self);
         }
         self.sequence = Some(sequence);
         self.total_chunks = Some(total_chunks);
-        self
+        Ok(self)
     }
 }
