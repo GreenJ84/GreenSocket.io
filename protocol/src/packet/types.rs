@@ -1,6 +1,6 @@
 use std::convert::TryFrom;
 
-use crate::error::ProtocolError;
+use super::error::PacketError;
 
 /// Represents the type of packet.
 /// Each variant corresponds to a specific packet type in the protocol.
@@ -21,13 +21,13 @@ pub enum PacketType {
     /// No-operation packet.
     Noop = 6,
     /// Error packet.
-    Error = 255,
+    Error = 9,
 }
 
 impl TryFrom<&str> for PacketType {
-  type Error = ProtocolError;
+  type Error = PacketError;
 
-  fn try_from(s: &str) -> Result<Self, ProtocolError> {
+  fn try_from(s: &str) -> Result<Self, PacketError> {
     match s {
       "open" => Ok(Self::Open),
       "close" => Ok(Self::Close),
@@ -37,15 +37,33 @@ impl TryFrom<&str> for PacketType {
       "upgrade" => Ok(Self::Upgrade),
       "noop" => Ok(Self::Noop),
       "error" => Ok(Self::Error),
-      _ => Err(ProtocolError::InvalidType),
+      _ => Err(PacketError::InvalidPacketType),
+    }
+  }
+}
+
+impl TryFrom<char> for PacketType {
+  type Error = PacketError;
+
+  fn try_from(c: char) -> Result<Self, PacketError> {
+    match c {
+      '0' => Ok(Self::Open),
+      '1' => Ok(Self::Close),
+      '2' => Ok(Self::Ping),
+      '3' => Ok(Self::Pong),
+      '4' => Ok(Self::Message),
+      '5' => Ok(Self::Upgrade),
+      '6' => Ok(Self::Noop),
+      '9' => Ok(Self::Error),
+      _ => Err(PacketError::InvalidPacketType),
     }
   }
 }
 
 impl TryFrom<u8> for PacketType {
-  type Error = ProtocolError;
+  type Error = PacketError;
 
-  fn try_from(c: u8) -> Result<Self, ProtocolError> {
+  fn try_from(c: u8) -> Result<Self, PacketError> {
     match c {
       0 => Ok(Self::Open),
       1 => Ok(Self::Close),
@@ -54,8 +72,8 @@ impl TryFrom<u8> for PacketType {
       4 => Ok(Self::Message),
       5 => Ok(Self::Upgrade),
       6 => Ok(Self::Noop),
-      255 => Ok(Self::Error),
-      _ => Err(ProtocolError::InvalidType),
+      9 => Ok(Self::Error),
+      _ => Err(PacketError::InvalidPacketType),
     }
   }
 }
@@ -75,6 +93,20 @@ impl PacketType {
     }
   }
 
+  /// Returns the char representation of the packet type.
+  pub fn as_char(&self) -> char {
+    match self {
+      Self::Open => '0',
+      Self::Close => '1',
+      Self::Ping => '2',
+      Self::Pong => '3',
+      Self::Message => '4',
+      Self::Upgrade => '5',
+      Self::Noop => '6',
+      Self::Error => '9',
+    }
+  }
+
   /// Returns the integer representation of the packet type.
   pub fn as_int(&self) -> u8 {
     match self {
@@ -85,7 +117,7 @@ impl PacketType {
       Self::Message => 4,
       Self::Upgrade => 5,
       Self::Noop => 6,
-      Self::Error => 255,
+      Self::Error => 9,
     }
   }
 }
