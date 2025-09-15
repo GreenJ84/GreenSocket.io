@@ -23,10 +23,6 @@ pub struct Packet {
 }
 
 impl Packet {
-
-}
-
-impl Packet {
     /// Creates a new packet.
     pub fn new(_type: PacketType) -> Self {
         Self {
@@ -47,7 +43,7 @@ impl Packet {
     }
 
     /// Sets the packet options.
-    pub fn with_options(mut self, options: PacketOptions) -> Self {
+    pub fn with_options(&mut self, options: PacketOptions) -> &Self {
         self.options = Some(options);
         self
     }
