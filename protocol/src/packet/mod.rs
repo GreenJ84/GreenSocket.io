@@ -2,11 +2,11 @@ pub(crate) mod options;
 pub(crate) mod types;
 pub(crate) mod error;
 
+use super::constants::RawData;
 use options::PacketOptions;
 use types::PacketType;
 use error::PacketError;
 
-use crate::constants::RawData;
 
 /// Maximum allowed packet size (1 MB).
 pub const MAX_PACKET_SIZE: usize = 1024 * 1024;
@@ -15,11 +15,15 @@ pub const MAX_PACKET_SIZE: usize = 1024 * 1024;
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub struct Packet {
     /// The type of the packet.
-    pub _type: PacketType,
+    _type: PacketType,
     /// Optional transmission options.
-    pub options: Option<PacketOptions>,
+    options: Option<PacketOptions>,
     /// Optional packet data (text or binary).
-    pub data: Option<RawData>,
+    data: Option<RawData>,
+}
+
+impl Packet {
+
 }
 
 impl Packet {
@@ -32,14 +36,29 @@ impl Packet {
         }
     }
 
+    /// Returns the packet type.
+    pub fn packet_type(&self) -> &PacketType {
+        &self._type
+    }
+
+    /// Returns a reference to the packet options, if any.
+    pub fn options(&self) -> Option<&PacketOptions> {
+        self.options.as_ref()
+    }
+
     /// Sets the packet options.
     pub fn with_options(mut self, options: PacketOptions) -> Self {
         self.options = Some(options);
         self
     }
 
+    /// Returns a reference to the packet data, if any.
+    pub fn data(&self) -> Option<&RawData> {
+        self.data.as_ref()
+    }
+
     /// Sets the packet data.
-    pub fn with_data(mut self, data: RawData) -> Result<(), PacketError> {
+    pub fn with_data(&mut self, data: RawData) -> Result<(), PacketError> {
         if data.len() > MAX_PACKET_SIZE {
             return Err(PacketError::DataTooLarge);
         }
