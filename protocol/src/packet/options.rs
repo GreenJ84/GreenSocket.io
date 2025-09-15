@@ -1,5 +1,4 @@
-pub(crate) mod encode;
-pub(crate) mod decode;
+use super::error::PacketError;
 
 /// Options for packet transmission. "Packet Headers"
 #[derive(PartialEq, Eq, Debug, Clone, Default)]
@@ -34,10 +33,10 @@ impl PacketOptions {
     }
 
     /// Sets chunking information for the packet.
-    pub fn with_chunking(mut self, sequence: u16, total_chunks: u16) -> Result<Self, Self> {
+    pub fn with_chunking(mut self, sequence: u16, total_chunks: u16) -> Result<Self, PacketError> {
         if total_chunks < 2 || sequence > total_chunks || sequence < 1 {
             eprintln!("Invalid chunking parameters");
-            return Err(self);
+            return Err(PacketError::InvalidChunkingParameters);
         }
         self.sequence = Some(sequence);
         self.total_chunks = Some(total_chunks);
