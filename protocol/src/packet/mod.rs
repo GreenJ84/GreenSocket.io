@@ -37,7 +37,7 @@ impl Packet {
     }
 
     /// Returns the packet type.
-    pub fn packet_type(&self) -> &PacketType {
+    pub fn _type(&self) -> &PacketType {
         &self._type
     }
 
