@@ -1,3 +1,5 @@
+pub(crate) mod options;
+
 use base64::{Engine as _, engine::general_purpose};
 
 use crate::constants::*;
@@ -16,16 +18,16 @@ impl Packet {
     /// [PacketType (1 byte), PacketOptions (6 bytes), Data prefix (1 byte), Data (variable)]
     fn encode_binary(self) -> BinaryType {
         let mut bin = Vec::<u8>::new();
-        bin.push(self._type.as_int());
+        bin.push(self._type().as_int());
         bin.push(
-            if self.options.is_some() { 1 } else { 0 }
+            if self.options().is_some() { 1 } else { 0 }
         );
         bin.push(
-            if self.data.is_some() { 1 } else { 0 }
+            if self.data().is_some() { 1 } else { 0 }
         );
 
-        if let Some(opts) = self.options {
-            match opts.encode(true) {
+        if let Some(opts) = self.options() {
+            match (*opts).encode(true) {
                 RawData::Binary(bytes) => bin.extend_from_slice(&bytes),
                 _ => {
                     debug_assert!(false, "PacketOptions.encode(true) did not return RawData::Binary");
@@ -34,7 +36,7 @@ impl Packet {
             }
         }
 
-        match &self.data {
+        match &self.data() {
             Some(RawData::Binary(data)) => {
                 bin.push(BINARY_MASK);
                 bin.extend_from_slice(data);
@@ -52,9 +54,9 @@ impl Packet {
     /// Format: "<packet_type><options><data_prefix><data>"
     fn encode_text(self) -> String {
         let mut encoded = String::new();
-        encoded.push(self._type.as_char());
+        encoded.push(self._type().as_char());
 
-        if let Some(opts) = self.options {
+        if let Some(opts) = self.options() {
             match opts.encode(false) {
                 RawData::Text(text) => encoded.push_str(&text),
                 _ => {
@@ -65,7 +67,7 @@ impl Packet {
         }
 
         encoded.push('-');
-        match &self.data {
+        match &self.data() {
             Some(RawData::Binary(data)) => {
                 encoded.push('b');
                 encoded.push_str(&general_purpose::URL_SAFE.encode(data));
