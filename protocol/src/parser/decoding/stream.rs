@@ -5,7 +5,7 @@ use futures::Stream;
 use pin_project::pin_project;
 
 use crate::constants::*;
-use super::Packet;
+use crate::packet::Packet;
 
 #[pin_project]
 #[derive(Debug)]
