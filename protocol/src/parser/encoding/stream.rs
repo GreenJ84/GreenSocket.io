@@ -3,8 +3,8 @@ use std::task::{Context, Poll};
 use futures::Stream;
 use pin_project::pin_project;
 
-use super::Packet;
 use crate::constants::{RawData, BINARY_MASK, BinaryType};
+use crate::packet::Packet;
 
 #[pin_project]
 pub struct PacketEncoderStream<S> {
