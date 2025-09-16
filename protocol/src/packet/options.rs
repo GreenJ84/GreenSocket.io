@@ -14,9 +14,18 @@ pub struct PacketOptions {
 }
 
 impl PacketOptions {
-    /// Creates a new PacketOptions with default values.
-    pub fn new() -> Self {
-        Self::default()
+    /// Creates a new `PacketOptions` instance with specified parameters.
+    pub fn new(compress: bool, encrypt: bool, sequence: Option<u16>, total_chunks: Option<u16>) -> Result<Self, PacketError> {
+        let mut options = Self::default();
+
+        options.compress = compress;
+        options.encrypt = encrypt;
+        if let (Some(seq), Some(total)) = (sequence, total_chunks) {
+            options = options.with_chunking(seq, total)?;
+        } else if sequence.is_some() || total_chunks.is_some() {
+            return Err(PacketError::InvalidChunkingParameters);
+        }
+        Ok(options)
     }
 
     /// Returns whether compression is enabled.
@@ -53,10 +62,11 @@ impl PacketOptions {
 
     /// Sets chunking information for the packet.
     pub fn with_chunking(mut self, sequence: u16, total_chunks: u16) -> Result<Self, PacketError> {
-        if total_chunks < 2 || sequence > total_chunks || sequence < 1 {
+        if sequence > total_chunks || total_chunks == 0 {
             eprintln!("Invalid chunking parameters");
             return Err(PacketError::InvalidChunkingParameters);
         }
+
         self.sequence = Some(sequence);
         self.total_chunks = Some(total_chunks);
         Ok(self)
