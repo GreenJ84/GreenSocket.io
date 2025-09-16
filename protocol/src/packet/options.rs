@@ -21,7 +21,7 @@ impl PacketOptions {
         options.compress = compress;
         options.encrypt = encrypt;
         if let (Some(seq), Some(total)) = (sequence, total_chunks) {
-            options = options.with_chunking(seq, total)?;
+            options.with_chunking(seq, total)?;
         } else if sequence.is_some() || total_chunks.is_some() {
             return Err(PacketError::InvalidChunkingParameters);
         }
@@ -61,14 +61,14 @@ impl PacketOptions {
     }
 
     /// Sets chunking information for the packet.
-    pub fn with_chunking(mut self, sequence: u16, total_chunks: u16) -> Result<Self, PacketError> {
-        if sequence > total_chunks || total_chunks == 0 {
+    pub fn with_chunking(&mut self, sequence: u16, total_chunks: u16) -> Result<(), PacketError> {
+        if sequence > total_chunks || sequence == 0 || total_chunks == 0 {
             eprintln!("Invalid chunking parameters");
             return Err(PacketError::InvalidChunkingParameters);
         }
 
         self.sequence = Some(sequence);
         self.total_chunks = Some(total_chunks);
-        Ok(self)
+        Ok(())
     }
 }
