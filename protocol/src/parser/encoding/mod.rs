@@ -2,8 +2,13 @@ pub(crate) mod options;
 
 use base64::{Engine as _, engine::general_purpose};
 
-use crate::constants::*;
-use crate::Packet;
+use crate::{
+    Packet,
+    RawData,
+    BinaryType,
+    constants::BINARY_MASK,
+    constants::PLAIN_TEXT_MASK,
+};
 
 impl Packet {
     /// Encodes the packet as either binary or text, depending on supports_binary.

@@ -1,6 +1,6 @@
 use std::convert::TryFrom;
 
-use super::error::PacketError;
+use crate::PacketError;
 
 /// Represents the type of packet.
 /// Each variant corresponds to a specific packet type in the protocol.

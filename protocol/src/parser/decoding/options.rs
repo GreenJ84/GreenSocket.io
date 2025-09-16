@@ -1,7 +1,10 @@
-use super::PacketOptions;
-use crate::constants::*;
-use crate::packet::error::PacketError;
-use crate::parser::error::DecodingError;
+use crate::{
+    PacketError,
+    PacketOptions,
+    RawData,
+    BinaryType,
+    DecodingError
+};
 
 impl PacketOptions {
     /// Decodes PacketOptions from RawData, choosing binary or text based on the data type.

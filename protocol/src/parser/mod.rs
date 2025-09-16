@@ -1,5 +1,3 @@
-pub(crate) mod encode;
-pub(crate) mod decode;
-pub(crate) mod encoding_stream;
-pub(crate) mod decoding_stream;
-
+pub(crate) mod encoding;
+pub(crate) mod decoding;
+pub(crate) mod error;

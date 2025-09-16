@@ -1,5 +1,7 @@
-use crate::PacketOptions;
-use crate::constants::RawData;
+use crate::{
+    PacketOptions,
+    RawData
+};
 
 impl PacketOptions {
     /// Encodes PacketOptions into RawData, choosing binary or text based on supports_binary.

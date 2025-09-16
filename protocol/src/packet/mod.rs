@@ -2,7 +2,7 @@ pub(crate) mod options;
 pub(crate) mod types;
 pub(crate) mod error;
 
-use super::constants::RawData;
+use crate::RawData;
 use options::PacketOptions;
 use types::PacketType;
 use error::PacketError;

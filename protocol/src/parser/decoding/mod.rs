@@ -1,16 +1,17 @@
 pub(crate) mod options;
 
-
 use base64::{Engine as _, engine::general_purpose};
-
-use crate::constants::*;
 use crate::{
     Packet,
     PacketType,
     PacketError,
-    PacketOptions
+    PacketOptions,
+    RawData,
+    BinaryType,
+    constants::BINARY_MASK,
+    constants::PLAIN_TEXT_MASK,
+    DecodingError
 };
-use super::error::DecodingError;
 
 impl Packet {
     pub fn decode(encoded_packet: RawData) -> Result<Self, DecodingError> {
@@ -46,9 +47,10 @@ impl Packet {
         if has_data {
             let data_type = encoded[10];
             let data: RawData = match data_type {
-                BINARY_MASK => RawData::Binary(encoded[11..].to_vec()),
-                _ => RawData::Text(String::from_utf8_lossy(&encoded[11..]).into()),
-            };
+                BINARY_MASK => Ok(RawData::Binary(encoded[11..].to_vec())),
+                PLAIN_TEXT_MASK => Ok(RawData::Text(String::from_utf8_lossy(&encoded[11..]).into())),
+                _ => Err(DecodingError::InvalidFormat),
+            }?;
             packet.with_data(data)
                 .map_err(|e| DecodingError::Packet(e))?;
         }

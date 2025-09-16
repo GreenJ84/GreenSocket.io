@@ -1,7 +1,7 @@
 use std::fmt;
 use base64::DecodeError;
 
-use crate::packet::error::PacketError;
+use crate::PacketError;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum EncodingError {
