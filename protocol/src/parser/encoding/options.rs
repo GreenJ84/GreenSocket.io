@@ -33,8 +33,8 @@ impl PacketOptions {
     fn encode_text(&self) -> String {
         format!(
             "{}:{}:{}:{}",
-            self.compress(),
-            self.encrypt(),
+            self.compress() as u8,
+            self.encrypt() as u8,
             self.sequence().unwrap_or(0),
             self.total_chunks().unwrap_or(0),
         )
