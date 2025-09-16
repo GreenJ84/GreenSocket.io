@@ -1,4 +1,4 @@
-use super::PacketOptions;
+use crate::PacketOptions;
 use crate::constants::RawData;
 
 impl PacketOptions {
@@ -13,15 +13,15 @@ impl PacketOptions {
     /// Encodes PacketOptions as a compact byte array.
     fn encode_binary(&self) -> Vec<u8> {
         let mut buffer = Vec::new();
-        buffer.push(self.compress as u8);
-        buffer.push(self.encrypted as u8);
+        buffer.push(self.compress() as u8);
+        buffer.push(self.encrypt() as u8);
 
         // Encode sequence and total_chunks as u16 (2 bytes each)
         buffer.extend_from_slice(
-            &(self.sequence.unwrap_or(0) as u16).to_be_bytes()
+            &(self.sequence().unwrap_or(0)).to_be_bytes()
         );
         buffer.extend_from_slice(
-            &(self.total_chunks.unwrap_or(0) as u16).to_be_bytes()
+            &(self.total_chunks().unwrap_or(0)).to_be_bytes()
         );
 
         buffer
@@ -31,10 +31,10 @@ impl PacketOptions {
     fn encode_text(&self) -> String {
         format!(
             "{}:{}:{}:{}",
-            self.compress as u8,
-            self.encrypted as u8,
-            self.sequence.unwrap_or(0),
-            self.total_chunks.unwrap_or(0),
+            self.compress(),
+            self.encrypt(),
+            self.sequence().unwrap_or(0),
+            self.total_chunks().unwrap_or(0),
         )
     }
 }
