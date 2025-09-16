@@ -3,7 +3,7 @@ pub(crate) mod options;
 use base64::{Engine as _, engine::general_purpose};
 
 use crate::constants::*;
-use crate::packet::Packet;
+use crate::Packet;
 
 impl Packet {
     /// Encodes the packet as either binary or text, depending on supports_binary.
@@ -18,7 +18,7 @@ impl Packet {
     /// [PacketType (1 byte), PacketOptions (6 bytes), Data prefix (1 byte), Data (variable)]
     fn encode_binary(self) -> BinaryType {
         let mut bin = Vec::<u8>::new();
-        bin.push(self._type().as_int());
+        bin.push(self._type().to_owned().into());
         bin.push(
             if self.options().is_some() { 1 } else { 0 }
         );
@@ -27,7 +27,7 @@ impl Packet {
         );
 
         if let Some(opts) = self.options() {
-            match (*opts).encode(true) {
+            match opts.to_owned().encode(true) {
                 RawData::Binary(bytes) => bin.extend_from_slice(&bytes),
                 _ => {
                     debug_assert!(false, "PacketOptions.encode(true) did not return RawData::Binary");
@@ -36,7 +36,7 @@ impl Packet {
             }
         }
 
-        match &self.data() {
+        match self.data() {
             Some(RawData::Binary(data)) => {
                 bin.push(BINARY_MASK);
                 bin.extend_from_slice(data);
@@ -54,10 +54,16 @@ impl Packet {
     /// Format: "<packet_type><options><data_prefix><data>"
     fn encode_text(self) -> String {
         let mut encoded = String::new();
-        encoded.push(self._type().as_char());
+        encoded.push(self._type().to_owned().into());
+        encoded.push(
+            if self.options().is_some() { '1' } else { '0' }
+        );
+        encoded.push(
+            if self.data().is_some() { '1' } else { '0' }
+        );
 
         if let Some(opts) = self.options() {
-            match opts.encode(false) {
+            match opts.to_owned().encode(false) {
                 RawData::Text(text) => encoded.push_str(&text),
                 _ => {
                     debug_assert!(false, "PacketOptions.encode(false) did not return RawData::Text");
@@ -67,7 +73,7 @@ impl Packet {
         }
 
         encoded.push('-');
-        match &self.data() {
+        match self.data() {
             Some(RawData::Binary(data)) => {
                 encoded.push('b');
                 encoded.push_str(&general_purpose::URL_SAFE.encode(data));
