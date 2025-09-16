@@ -78,46 +78,47 @@ impl TryFrom<u8> for PacketType {
   }
 }
 
-impl PacketType {
-  /// Returns the string representation of the packet type.
-  pub fn as_str(&self) -> &'static str {
-    match self {
-      Self::Open => "open",
-      Self::Close => "close",
-      Self::Ping => "ping",
-      Self::Pong => "pong",
-      Self::Message => "message",
-      Self::Upgrade => "upgrade",
-      Self::Noop => "noop",
-      Self::Error => "error",
+impl From<PacketType> for u8 {
+    fn from(pt: PacketType) -> Self {
+      match pt {
+        PacketType::Open => 0,
+        PacketType::Close => 1,
+        PacketType::Ping => 2,
+        PacketType::Pong => 3,
+        PacketType::Message => 4,
+        PacketType::Upgrade => 5,
+        PacketType::Noop => 6,
+        PacketType::Error => 9,
+      }
     }
-  }
+}
 
-  /// Returns the char representation of the packet type.
-  pub fn as_char(&self) -> char {
-    match self {
-      Self::Open => '0',
-      Self::Close => '1',
-      Self::Ping => '2',
-      Self::Pong => '3',
-      Self::Message => '4',
-      Self::Upgrade => '5',
-      Self::Noop => '6',
-      Self::Error => '9',
+impl From<PacketType> for char {
+    fn from(pt: PacketType) -> Self {
+      match pt {
+        PacketType::Open => '0',
+        PacketType::Close => '1',
+        PacketType::Ping => '2',
+        PacketType::Pong => '3',
+        PacketType::Message => '4',
+        PacketType::Upgrade => '5',
+        PacketType::Noop => '6',
+        PacketType::Error => '9',
+      }
     }
-  }
+}
 
-  /// Returns the integer representation of the packet type.
-  pub fn as_int(&self) -> u8 {
-    match self {
-      Self::Open => 0,
-      Self::Close => 1,
-      Self::Ping => 2,
-      Self::Pong => 3,
-      Self::Message => 4,
-      Self::Upgrade => 5,
-      Self::Noop => 6,
-      Self::Error => 9,
+impl From<PacketType> for &'static str {
+  fn from(pt: PacketType) -> Self {
+    match pt {
+      PacketType::Open => "open",
+      PacketType::Close => "close",
+      PacketType::Ping => "ping",
+      PacketType::Pong => "pong",
+      PacketType::Message => "message",
+      PacketType::Upgrade => "upgrade",
+      PacketType::Noop => "noop",
+      PacketType::Error => "error",
     }
   }
 }
