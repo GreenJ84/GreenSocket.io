@@ -72,6 +72,7 @@ impl Packet {
             '1' => true,
             _ => return Err(DecodingError::InvalidFormat),
         };
+
         let has_data = match chars.next().unwrap(){
             '0' => false,
             '1' => true,
@@ -80,30 +81,35 @@ impl Packet {
         if !has_options && !has_data { return Ok(packet); }
 
         if has_options {
-            if encoded.len() < 10 { return Err(DecodingError::Packet(PacketError::InvalidPacketOptions)); }
-
-            let raw_options = chars.by_ref().take(7).collect();
-            let options = PacketOptions::decode(RawData::Text(raw_options))?;
+            let mut options = String::new();
+            loop {
+                match chars.next() {
+                    Some('-') | None => break,
+                    Some(c) => options.push(c),
+                }
+            }
+            if options.len() < 7 || options.len() > 11 { return Err(DecodingError::Packet(PacketError::InvalidPacketOptions)); }
+            let options = PacketOptions::decode(RawData::Text(options))?;
             packet.with_options(options);
+
+            if !has_data { return Ok(packet); }
         }
 
-        if has_data {
-            let data = chars.collect::<String>();
-            match &data[..1] {
-                "b" => {
-                    let b64_data = &data[1..];
-                    match general_purpose::STANDARD.decode(b64_data) {
-                        Ok(bytes) => packet.with_data(RawData::Binary(bytes))
-                            .map_err(|e| DecodingError::Packet(e))?,
-                        Err(e) => return Err(DecodingError::Base64(e)),
-                    };
-                },
-                "t" => {
-                    packet.with_data(RawData::Text(data[1..].to_owned())).map_err(|e| DecodingError::Packet(e))?;
-                },
-                _ => return Err(DecodingError::InvalidFormat)
-            };
-        }
+        let data_type = chars.next().unwrap_or('x');
+        let data = chars.collect::<String>();
+        match data_type {
+            'b' => {
+                match general_purpose::STANDARD.decode(data) {
+                    Ok(bytes) => packet.with_data(RawData::Binary(bytes))
+                        .map_err(|e| DecodingError::Packet(e))?,
+                    Err(e) => return Err(DecodingError::Base64(e)),
+                };
+            },
+            't' => {
+                packet.with_data(RawData::Text(data.to_owned())).map_err(|e| DecodingError::Packet(e))?;
+            },
+            _ => return Err(DecodingError::InvalidFormat)
+        };
 
         Ok(packet)
     }

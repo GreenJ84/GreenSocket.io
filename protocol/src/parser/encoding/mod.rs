@@ -77,17 +77,18 @@ impl Packet {
             }
         }
 
-        encoded.push('-');
-        match self.data() {
-            Some(RawData::Binary(data)) => {
-                encoded.push('b');
-                encoded.push_str(&general_purpose::URL_SAFE.encode(data));
+        if let Some(data) = self.data() {
+            encoded.push('-');
+            match data {
+                RawData::Binary(data) => {
+                    encoded.push('b');
+                    encoded.push_str(&general_purpose::URL_SAFE.encode(data));
+                },
+                RawData::Text(text) => {
+                    encoded.push('t');
+                    encoded.push_str(text);
+                }
             }
-            Some(RawData::Text(text)) => {
-                encoded.push('t');
-                encoded.push_str(text);
-            }
-            None => {}
         }
         encoded
     }
