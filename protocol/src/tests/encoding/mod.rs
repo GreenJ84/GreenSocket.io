@@ -58,7 +58,7 @@ fn packet_with_options_no_data_text() {
     let encoded = packet.encode(false);
     assert_eq!(
         encoded,
-        RawData::Text(format!("{}10-1:1:0:0", char::from(PacketType::Message)))
+        RawData::Text(format!("{}101:1:0:0", char::from(PacketType::Message)))
     );
 }
 
@@ -218,7 +218,7 @@ fn packet_with_options_and_data_binary_cross_encoding() {
     let base64 = general_purpose::URL_SAFE.encode(&[9, 8, 7]);
     assert_eq!(
         encoded_text,
-        RawData::Text(format!("{}11-1:0:2:4-b{}", char::from(PacketType::Message), base64))
+        RawData::Text(format!("{}111:0:2:4-b{}", char::from(PacketType::Message), base64))
     );
 }
 
@@ -229,7 +229,7 @@ fn packet_with_options_and_data_text() {
     let encoded = packet.encode(false);
     assert_eq!(
         encoded,
-        RawData::Text(format!("{}11-1:0:2:4-txyz", char::from(PacketType::Message)))
+        RawData::Text(format!("{}111:0:2:4-txyz", char::from(PacketType::Message)))
     );
 }
 

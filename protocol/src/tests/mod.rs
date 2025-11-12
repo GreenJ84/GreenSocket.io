@@ -1,3 +1,8 @@
-mod packet_tests;
-mod encoding_tests;
-mod decoding_tests;
+#[cfg(test)]
+mod packet;
+
+#[cfg(test)]
+mod encoding;
+
+#[cfg(test)]
+mod decoding;
