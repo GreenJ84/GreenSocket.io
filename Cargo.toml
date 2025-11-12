@@ -1,7 +1,5 @@
 [workspace]
 members = [
-    "engine",
-    "engine_client",
     "protocol",
 ]
 resolver = "2"
