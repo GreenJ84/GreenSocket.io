@@ -24,10 +24,10 @@ impl PacketOptions {
         let mut options = PacketOptions::default();
 
         if bytes[0] == 1 {
-            options.with_compression();
+            options = options.with_compression();
         }
         if bytes[1] == 1 {
-            options.with_encryption();
+            options = options.with_encryption();
         }
 
         let sequence = u16::from_be_bytes([bytes[2], bytes[3]]);

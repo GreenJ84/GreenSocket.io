@@ -25,30 +25,39 @@ impl Packet {
         let encoded_len = encoded.len();
         if encoded_len < 3 { return Err(DecodingError::MissingField); }
 
-        let _type = PacketType::try_from(encoded[0])
+        let mut encoded = encoded.into_iter();
+
+        let _type = PacketType::try_from(encoded.next().unwrap())
             .map_err(|e| DecodingError::Packet(e))?;
         let mut packet = Packet::new(_type);
 
-        if encoded[1] > 1 || encoded[2] > 1 {
-            return Err(DecodingError::InvalidFormat);
-        }
-        let has_options = encoded[1] == 1;
-        let has_data = encoded[2] == 1;
+        let has_options = match encoded.next().unwrap() {
+            0 => false,
+            1 => true,
+            _ => return Err(DecodingError::InvalidFormat),
+        };
+        let has_data = match encoded.next().unwrap() {
+            0 => false,
+            1 => true,
+            _ => return Err(DecodingError::InvalidFormat),
+        };
+
         if !has_options && !has_data { return Ok(packet); }
 
         if has_options {
-            if encoded_len < 9 { return Err(DecodingError::Packet(PacketError::InvalidPacketOptions)); }
+            let options = encoded.by_ref().take(6).collect::<Vec<u8>>();
+            if options.len() < 6 { return Err(DecodingError::Packet(PacketError::InvalidPacketOptions)); }
             let opts = PacketOptions::decode(
-                RawData::Binary(encoded[3..10].to_vec())
+                RawData::Binary(options)
             )?;
             packet.with_options(opts);
         }
 
         if has_data {
-            let data_type = encoded[10];
+            let data_type = encoded.next().unwrap();
             let data: RawData = match data_type {
-                BINARY_MASK => Ok(RawData::Binary(encoded[11..].to_vec())),
-                PLAIN_TEXT_MASK => Ok(RawData::Text(String::from_utf8_lossy(&encoded[11..]).into())),
+                BINARY_MASK => Ok(RawData::Binary(encoded.collect())),
+                PLAIN_TEXT_MASK => Ok(RawData::Text(String::from_utf8_lossy(&encoded.collect::<Vec<u8>>()).into())),
                 _ => Err(DecodingError::InvalidFormat),
             }?;
             packet.with_data(data)
@@ -93,6 +102,8 @@ impl Packet {
             packet.with_options(options);
 
             if !has_data { return Ok(packet); }
+        } else {
+            chars.next();
         }
 
         let data_type = chars.next().unwrap_or('x');
