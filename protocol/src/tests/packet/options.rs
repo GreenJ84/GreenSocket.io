@@ -42,8 +42,9 @@ fn enable_both_compression_and_encryption() {
 
 #[test]
 fn set_and_get_valid_chunking() {
-    let opts = PacketOptions::default()
-      .with_chunking(2, 4).unwrap();
+    let mut opts = PacketOptions::default();
+    opts.with_chunking(2, 4).unwrap();
+
     assert!(!opts.compress());
     assert!(!opts.encrypt());
     assert_eq!(opts.sequence(), Some(2));
