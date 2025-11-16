@@ -1,0 +1,9 @@
+[package]
+name = "green-socket"
+version = "0.1.0"
+edition = "2021"
+resolver = "2"
+authors.workspace = true
+description = "A Rust implementation of Socket.io's Socket"
+
+[dependencies]
