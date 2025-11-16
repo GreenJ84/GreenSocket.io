@@ -1,0 +1,11 @@
+[workspace]
+members = [
+    "engine",
+    "socket",
+]
+
+[workspace.package]
+authors = ["Jesse Greenough"]
+description = "Rust Socket.io Engine and Socket Implementations"
+
+[workspace.dependencies]
