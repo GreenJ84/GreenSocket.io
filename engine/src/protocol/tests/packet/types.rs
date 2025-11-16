@@ -1,4 +1,4 @@
-use crate::{PacketError, PacketType};
+use crate::protocol::{PacketError, PacketType};
 
 
 #[test]

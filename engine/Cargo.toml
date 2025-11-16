@@ -1,14 +1,13 @@
-[workspace]
-members = ["protocol"]
+[package]
+name = "green-engine"
+version = "0.1.0"
+edition = "2021"
 resolver = "2"
+authors.workspace = true
+description = "A Rust implementation of Socket.io's Engine"
 
-[workspace.package]
-authors = ["Jesse Greenough"]
-description = "Socket.io Implementation"
-
-
-[workspace.dependencies]
-base64 = "0.22"
+[dependencies]
+base64 = "0.22.1"
 bytes = "1"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"

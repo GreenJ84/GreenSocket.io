@@ -1,4 +1,4 @@
-use crate::PacketError;
+use crate::protocol::PacketError;
 
 /// Options for packet transmission. "Packet Headers"
 #[derive(PartialEq, Eq, Debug, Default, Copy, Clone)]

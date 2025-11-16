@@ -1,4 +1,4 @@
-use crate::{DecodingError, PacketError, PacketOptions, RawData};
+use crate::protocol::{DecodingError, PacketError, PacketOptions, RawData};
 
 #[test]
 fn decode_default_binary() {

@@ -2,7 +2,7 @@
 mod options;
 
 use base64::{Engine as _, engine::general_purpose};
-use crate::{
+use crate::protocol::{
     Packet,
     PacketOptions,
     PacketType,

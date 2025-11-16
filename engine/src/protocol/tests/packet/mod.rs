@@ -4,7 +4,7 @@ mod types;
 #[cfg(test)]
 mod options;
 
-use crate::{RawData, Packet, PacketError, PacketOptions, PacketType, MAX_PACKET_SIZE};
+use crate::protocol::{RawData, Packet, PacketError, PacketOptions, PacketType, MAX_PACKET_SIZE};
 
 #[test]
 fn valid_full_packet_creation() {

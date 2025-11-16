@@ -1,4 +1,4 @@
-use crate::{
+use crate::protocol::{
     RawData,
     PacketOptions,
 };

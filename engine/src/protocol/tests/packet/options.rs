@@ -1,4 +1,4 @@
-use crate::{PacketOptions, PacketError};
+use crate::protocol::{PacketOptions, PacketError};
 
 #[test]
 fn default_has_options_disabled() {
